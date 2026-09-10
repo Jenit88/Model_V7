@@ -1,4 +1,4 @@
-# Model_V7
+
 # Model_v7
 
 **Successor line to Model V6.2.** Replaces the centre-heatmap + offset-vector
