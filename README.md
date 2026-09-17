@@ -6,7 +6,7 @@ Model V7 looks at a photo of a printed circuit board (PCB) and finds four kinds 
 - the **outline**: the exact pixels the shape covers, not just a box around it
 - a **confidence score** from 0 to 1
 
-The model was trained from scratch and is ready to use. Download the trained model file from the [Releases page](https://github.com/Jenit88/Model_V7/releases).
+The model was trained from scratch and is ready to use. The trained model file is on the [Releases page](https://github.com/Jenit88/Model_V7/releases); see [Use the trained model](#use-the-trained-model).
 
 ![Model V7 result on a test image](results/examples/sample_val_000017.png)
 
@@ -17,13 +17,14 @@ The model was trained from scratch and is ready to use. Download the trained mod
 1. [What the model finds](#what-the-model-finds)
 2. [Results](#results)
 3. [How it works](#how-it-works)
-4. [How it was trained](#how-it-was-trained)
-5. [Use the trained model](#use-the-trained-model)
-6. [Check the scores yourself](#check-the-scores-yourself)
-7. [Train your own model](#train-your-own-model)
-8. [Run the tests](#run-the-tests)
-9. [Limitations and things to know](#limitations-and-things-to-know)
-10. [Files in this repository](#files-in-this-repository)
+4. [Model architecture](#model-architecture)
+5. [How it was trained](#how-it-was-trained)
+6. [Use the trained model](#use-the-trained-model)
+7. [Check the scores yourself](#check-the-scores-yourself)
+8. [Train your own model](#train-your-own-model)
+9. [Run the tests](#run-the-tests)
+10. [Limitations and things to know](#limitations-and-things-to-know)
+11. [Files in this repository](#files-in-this-repository)
 
 ## What the model finds
 
@@ -73,7 +74,7 @@ Full tables, training logs, evaluation reports and more example pictures are in 
 
 **1. Resize.** The picture is scaled to 512 × 512 pixels without stretching. Grey bars fill any empty space.
 
-**2. Predict three maps.** One neural network (6.3 million parameters) reads the picture and outputs three maps:
+**2. Predict three maps.** The neural network reads the picture and outputs three maps:
 
 | map | size | what it gives for each pixel |
 |---|---|---|
@@ -91,11 +92,143 @@ The inner-distance map is the main idea. Every shape, big or small, looks the sa
 4. The edge map separates shapes that are still stuck together.
 5. Very small pieces (under 13 pixels) are thrown away.
 
-**4. Score each shape.** The confidence score checks whether the predicted inner-distance map fits the shape's own outline, then multiplies that by how sure the network is about the class. A clean, whole shape scores high. A broken piece, or two shapes merged into one, scores lower.
+**4. Score each shape.** The confidence score combines two checks. First, does the predicted inner-distance map fit the shape's own outline? A clean, whole shape fits well; a broken piece, or two shapes merged into one, does not. Second, how sure is the network about the shape's class?
 
 **5. Scale back.** The outlines are mapped back to the size of the original picture.
 
-**Inside the network:** the first layers look at both the colours and the edges of the picture (a fixed Sobel edge filter). An encoder then shrinks the picture step by step to learn bigger patterns. A feature pyramid (BiFPN) mixes fine and coarse detail. Two decoders build the maps: one makes the class map and the edge map, the other makes the inner-distance map.
+The network itself is explained part by part in [Model architecture](#model-architecture).
+
+## Model architecture
+
+This section explains how the network inside Model V7 is built, from the picture going in to the three maps coming out.
+
+### The big picture
+
+The network has six parts, and the picture flows through them in this order:
+
+1. **Input stem:** looks at the colours of the picture and, separately, at its edges.
+2. **Encoder:** makes the picture smaller step by step and learns more and more complex patterns.
+3. **Feature pyramid:** mixes fine detail with big-picture information.
+4. **Context modules:** look around every spot at several distances at once.
+5. **Class + edge decoder:** makes the result bigger again and says which class each pixel is and where the edges are.
+6. **Inner-distance decoder:** makes its own result bigger again and says where the middle of each shape is.
+
+Parts 1 to 3 are shared. After that the network splits into two branches, because "which class is this pixel?" and "where is the middle of this shape?" are different questions. Each branch has its own context module and its own decoder.
+
+Sizes are written as **height × width × channels**. Channels are the number of different features the network keeps for every spot; a colour picture has 3 (red, green and blue).
+
+```mermaid
+flowchart TD
+    IMG["Input picture<br/>512 × 512 × 3"]
+
+    subgraph S1["1 · Input stem"]
+        SOB["Sobel edge filter<br/>512 × 512 × 3"]
+        RGB["Colour conv block<br/>512 × 512 × 20"]
+        EDG["Edge conv block<br/>512 × 512 × 12"]
+        STEM["C3k2 fusion<br/>512 × 512 × 32"]
+    end
+
+    subgraph S2["2 · Encoder"]
+        E1["Level 1 · 256 × 256 × 40"]
+        E2["Level 2 · 128 × 128 × 72"]
+        E3["Level 3 · 64 × 64 × 144"]
+        E4["Level 4 · 32 × 32 × 256"]
+        E5["Level 5 · 16 × 16 × 384<br/>SPPF + channel attention"]
+    end
+
+    subgraph S3["3 · Feature pyramid"]
+        BIF["BiFPN × 2<br/>mixes levels 3, 4 and 5<br/>64 × 64 × 160"]
+    end
+
+    subgraph S4["4 · Context modules"]
+        CC["Class context<br/>64 × 64 × 176"]
+        SC["Shape context<br/>64 × 64 × 160"]
+    end
+
+    subgraph S5["5 · Class + edge decoder"]
+        D128["128 × 128 × 112"]
+        D256["256 × 256 × 80"]
+        DFULL["256 × 256 × 56"]
+        EDGEF["Edge features<br/>256 × 256 × 40"]
+        CLSF["Class features<br/>256 × 256 × 64"]
+    end
+
+    subgraph S6["6 · Inner-distance decoder"]
+        I128["128 × 128 × 104"]
+        I256["256 × 256 × 72"]
+        IFUSE["256 × 256 × 80"]
+        IDIST["256 × 256 × 48"]
+    end
+
+    OUTC(["Class map<br/>512 × 512 × 5"])
+    OUTE(["Edge map<br/>512 × 512 × 1"])
+    OUTD(["Inner-distance map<br/>256 × 256 × 1"])
+
+    IMG --> SOB --> EDG --> STEM
+    IMG --> RGB --> STEM
+    STEM --> E1 --> E2 --> E3 --> E4 --> E5
+    E3 --> BIF
+    E4 --> BIF
+    E5 --> BIF
+    BIF --> CC
+    BIF --> SC
+    CC --> D128 --> D256 --> DFULL --> EDGEF --> OUTE
+    DFULL --> CLSF
+    EDGEF --> CLSF --> OUTC
+    SC --> I128 --> I256 --> IFUSE --> IDIST --> OUTD
+    E2 -.-> D128
+    E1 -.-> D256
+    STEM -.-> DFULL
+    E2 -.-> I128
+    E1 -.-> I256
+    EDGEF -.-> IFUSE
+```
+
+*Solid arrows are the main path. Dotted arrows are shortcuts that carry saved detail from earlier parts (and edge hints) into the decoders.*
+
+### The six parts
+
+| part | what it does | output size | learned parameters |
+|---|---|---|---:|
+| 1. Input stem | Runs a fixed edge filter (Sobel) next to a normal filter on the colours, then combines the two views. | 512 × 512 × 32 | 7,776 (0.1%) |
+| 2. Encoder | Halves the size five times: 512 → 256 → 128 → 64 → 32 → 16. Each smaller level covers a bigger area of the board, so it can learn bigger patterns. The last level adds SPPF and channel attention. | 16 × 16 × 384 | 4,780,048 (75.4%) |
+| 3. Feature pyramid | Two rounds of BiFPN mix levels 3, 4 and 5, so the 64 × 64 level also knows about large structures. | 64 × 64 × 160 | 752,013 (11.9%) |
+| 4. Context modules | Two separate modules, one for each branch. Each looks at every spot and around it at three wider distances at the same time. | 64 × 64 × 176 (class) and 64 × 64 × 160 (shape) | 134,842 (2.1%) |
+| 5. Class + edge decoder | Doubles the size twice (64 → 128 → 256). Each time it adds back the saved encoder level of the same size, so outlines stay sharp. It predicts the edge map first, then uses the edge features to help predict the class map. Both maps are smoothly scaled up to 512 × 512. | 512 × 512 × 5 and 512 × 512 × 1 | 325,574 (5.1%) |
+| 6. Inner-distance decoder | Doubles the size twice in the same way, adds hints from the edge features, and predicts the inner-distance map. | 256 × 256 × 1 | 343,233 (5.4%) |
+| **total** | | | **6,343,486** |
+
+Both decoders stop at half size (256 × 256). This saves memory and time, and it keeps enough detail: the shapes in these pictures are mostly 16 to 36 pixels across. The class map and edge map are then smoothly scaled up to 512 × 512.
+
+### The building blocks
+
+| block | what it is, in simple words | where it is used |
+|---|---|---|
+| **Convolution** | A small learned filter, usually 3 × 3 pixels, that slides over the picture or feature map and reacts to a pattern, such as a corner or a curve. | everywhere (110 layers) |
+| **Conv block** | Convolution, then group normalization (keeps the numbers in a steady range, and works well when only 2 images are trained at a time), then SiLU (a smooth on/off switch that lets the network learn curved, non-linear patterns). | everywhere |
+| **Stride-2 convolution** | A convolution that jumps 2 pixels at a time, which halves the width and height. | encoder, feature pyramid |
+| **Separable convolution** | A cheaper convolution done in two steps: first each channel on its own across space, then mixing the channels. | feature pyramid, context modules, edge branch (13 layers) |
+| **Bottleneck** | Two conv blocks with a shortcut that adds the input to the output, so information passes through easily. | inside C3k2 |
+| **C3k2 block** | Splits the channels into two halves. One half goes through bottlenecks, the other skips them. Then both halves are joined and mixed again. This idea comes from YOLO models. | input stem, encoder, both decoders |
+| **SPPF** | Takes the maximum value in 5 × 5 windows, three times in a row, and joins all four versions. The deepest level then sees small, medium and large areas at once. | end of the encoder |
+| **Channel attention** | Looks at the whole feature map, scores how useful each channel is for this picture, and turns channels up or down. | end of the encoder, context modules |
+| **BiFPN** | Passes information from the smallest level to the largest (big picture into detail), then back again (detail into big picture). Where two levels meet, they are added with learned weights, so the network decides how much each level counts. | feature pyramid |
+| **Dilated convolution** | A 3 × 3 filter with gaps between its points (gaps of 2, 4 or 6), so it covers a wider area without making the map smaller. | context modules |
+| **Shortcut (skip) connection** | The decoder reuses detail saved by the encoder at the same size, so outlines stay sharp. | both decoders |
+| **Upsampling** | Smooth (bilinear) resizing that doubles the width and height. | decoders, outputs |
+| **Spatial dropout** | During training only: randomly switches off whole channels (10% in the class decoder, 5% in the inner-distance decoder), so the network does not depend on just a few features. | both decoders |
+| **Sobel edge filter** | A fixed filter (not learned) that measures how fast brightness changes left to right and top to bottom. It gives 3 channels: horizontal change, vertical change and edge strength. | input stem |
+
+### Inputs and outputs
+
+| | name | size | values |
+|---|---|---|---|
+| input | `image` | 512 × 512 × 3 | RGB picture with values from 0 to 1, resized with grey bars |
+| output | `semantic` | 512 × 512 × 5 | raw scores for background, `Rectangle`, `Rectangle_concave`, `circle` and `circle_full`; softmax turns them into probabilities |
+| output | `boundary` | 512 × 512 × 1 | raw edge score; sigmoid turns it into a probability |
+| output | `inner_distance` | 256 × 256 × 1 | 0 at the edge of a shape, 1 in its middle (already between 0 and 1) |
+
+In total the network has 457 layers and 6,343,486 learned parameters. It computes in mixed precision (float16) and gives its outputs in float32. You do not have to handle these raw outputs yourself: `predict_one_image` in `model_v7.py` resizes the picture, runs the network, turns the maps into shapes and maps them back to the original picture (see [Use the trained model](#use-the-trained-model)).
 
 ## How it was trained
 
@@ -109,9 +242,24 @@ The inner-distance map is the main idea. Every shape, big or small, looks the sa
 
 ## Use the trained model
 
-**You need:** Linux, or Windows with WSL2 (Ubuntu); Python 3.11; an NVIDIA GPU (strongly recommended).
+### The model file
 
-**1. Get the code and install the packages.**
+| | |
+|---|---|
+| file | `best_model_v7_instance.keras` |
+| download | [Releases → v1.0](https://github.com/Jenit88/Model_V7/releases/tag/v1.0) |
+| size | 231 MB |
+| format | Keras model file, saved with TensorFlow 2.21 and Keras 3.15 |
+| version | epoch 105 of 120, chosen on the validation set |
+| parameters | 6,343,486 |
+| input | any RGB picture (it is resized to 512 × 512 for you) |
+| output | every shape found: class, outline, confidence, size and position |
+
+The model is on the Releases page, not in the file list, because GitHub does not accept normal files larger than 100 MB.
+
+### 1. Install
+
+**You need:** Linux, or Windows with WSL2 (Ubuntu); Python 3.11; an NVIDIA GPU (strongly recommended).
 
 ```bash
 git clone https://github.com/Jenit88/Model_V7.git
@@ -122,16 +270,18 @@ python3.11 -m venv ~/envs/pcb62
 
 `env.sh` looks for the Python environment in `~/envs/pcb62`. If you made it somewhere else, run `export PCB_ENV=/your/env/folder` first.
 
-**2. Download the trained model** (`best_model_v7_instance.keras`, 231 MB) into `~/Models/Model_v7_scratch_rtx/`:
+### 2. Download the model
+
+Put `best_model_v7_instance.keras` in `~/Models/Model_v7_scratch_rtx/`:
 
 ```bash
 mkdir -p ~/Models/Model_v7_scratch_rtx
 gh release download v1.0 --repo Jenit88/Model_V7 --dir ~/Models/Model_v7_scratch_rtx
 ```
 
-You can also download it from the [Releases page](https://github.com/Jenit88/Model_V7/releases) in a browser. To keep it in another folder, run `export PCB_MODEL_OUTPUT_DIR=/that/folder`.
+You can also download it in a browser from the [Releases page](https://github.com/Jenit88/Model_V7/releases/tag/v1.0). To keep it in another folder, run `export PCB_MODEL_OUTPUT_DIR=/that/folder`.
 
-**3. Check that TensorFlow can see the GPU.**
+### 3. Check that TensorFlow can see the GPU
 
 ```bash
 source env.sh
@@ -140,18 +290,20 @@ $PCB_PYTHON -c "import tensorflow as tf; print(tf.config.list_physical_devices('
 
 If this prints `[]`, TensorFlow cannot see the GPU and will not use it.
 
-**4. Find shapes in your pictures.**
+### 4. Find shapes in your pictures
 
-To save a result picture for every image in a folder (needs a GPU):
+There are three ways to use the model.
+
+**A. Result pictures for a whole folder** (needs a GPU):
 
 ```bash
 source env.sh
 $PCB_PYTHON predict_pictures.py /path/to/images /path/to/output
 ```
 
-Each image gets a result picture with the same name in `/path/to/output`. If the run stops, start it again: finished images are skipped.
+Each image gets a result picture with the same name in `/path/to/output`, with every shape outlined, numbered and labelled with its class and confidence. If the run stops, start it again: finished images are skipped.
 
-To try the model on a random sample of a folder (also works without a GPU, just slower):
+**B. A random sample, with a summary of the scores** (also works without a GPU, just slower):
 
 ```bash
 PCB_SOURCE=/path/to/images PCB_PREDICT_OUT=/path/to/output PCB_SAMPLE=40 ./run.sh predict-folder
@@ -167,7 +319,53 @@ This picks 40 random images. It saves the result pictures in `/path/to/output/ov
 | `semantic_ids.npy`, `semantic_colour.png` | for each pixel, its class |
 | `semantic_confidence.png`, `boundary.png`, `inner_distance.png` | the network's maps as heat maps |
 
-Both scripts drop shapes with a confidence below **0.50**. To change that, put `PCB_MIN_CONFIDENCE=0.3` (or another value) in front of the command. To keep every shape, put `PCB_DEPLOYMENT_PROFILE=0` in front of it.
+A and B both drop shapes with a confidence below **0.50**. To change that, put `PCB_MIN_CONFIDENCE=0.3` (or another value) in front of the command. To keep every shape, put `PCB_DEPLOYMENT_PROFILE=0` in front of it.
+
+**C. In your own Python code.** Save this as a `.py` file in the repository folder and run it with `$PCB_PYTHON` (after `source env.sh`):
+
+```python
+import importlib.util
+import sys
+from pathlib import Path
+
+# Load the model code first: the model file uses layers defined in model_v7.py.
+spec = importlib.util.spec_from_file_location("model_v7", "model_v7.py")
+m = importlib.util.module_from_spec(spec)
+sys.modules["model_v7"] = m
+spec.loader.exec_module(m)
+
+import tensorflow as tf
+
+# Load the trained model.
+model_file = Path("~/Models/Model_v7_scratch_rtx/best_model_v7_instance.keras").expanduser()
+model = tf.keras.models.load_model(model_file, compile=False)
+
+# Optional: drop shapes with a confidence below 0.50, like A and B do.
+m.DEPLOYMENT_MIN_CONFIDENCE = 0.5
+
+# Find the shapes in one picture. The 8 result files are also saved in the output folder.
+result = m.predict_one_image(model, Path("board.png"), Path("output/board"))
+
+print(result["number_of_instances"], "shapes found")
+print(result["instances_per_class"])
+for shape in result["instances"]:
+    print(shape["instance_id"], shape["class_name"], round(shape["confidence"], 2), shape["bbox_xyxy"])
+```
+
+The first picture takes longer (about 10 seconds) while the GPU warms up. After loading the model once, call `predict_one_image` again for every other picture.
+
+Each item in `result["instances"]` is one shape. The most useful fields:
+
+| field | meaning |
+|---|---|
+| `instance_id` | the shape's number, as shown on the result picture and used in `instance_ids.npy` |
+| `class_name` | `Rectangle`, `Rectangle_concave`, `circle` or `circle_full` |
+| `confidence` | confidence score from 0 to 1 (`detection_score` holds the same value) |
+| `area_pixels` | how many pixels the shape covers in the original picture |
+| `bbox_xyxy` | the box around the shape: left, top, right, bottom (pixel positions, inclusive) |
+| `centroid_xy` | the centre point of the shape |
+| `equivalent_diameter_pixels` | the diameter of a circle with the same area |
+| `touches_image_border` | `true` if the shape touches the edge of the picture, so it may be cut off |
 
 ## Check the scores yourself
 
@@ -265,3 +463,4 @@ You can also run `./run.sh scratch` to train in the current terminal instead. 12
 | `run_v7_tests.sh`, `run_selftest_v7.py`, `test_*.py` | tests |
 | `results/` | training outputs, evaluation reports, per-image results and example pictures |
 | `TRAINING.md`, `change.md`, `change_2.md`, `inspection.md` | development notes, written before the final training run |
+| Releases → `best_model_v7_instance.keras` | the trained model (231 MB) |
