@@ -1,0 +1,137 @@
+{
+  "total_pixels": 113246208,
+  "correct_pixels": 111368982,
+  "overall_pixel_accuracy": 0.9834234979417589,
+  "mean_iou_including_background": 0.8703085037264469,
+  "foreground_mean_iou": 0.8422054474245756,
+  "foreground_mean_precision": 0.9238153038282348,
+  "foreground_mean_recall": 0.9050292514773141,
+  "foreground_mean_f1_dice": 0.9135647679469054,
+  "frequency_weighted_iou": 0.9682085695977007,
+  "foreground_micro_class_aware": {
+    "tp": 13705568,
+    "fp": 1076603,
+    "fn": 960624,
+    "predicted_instances": 14782171,
+    "target_instances": 14666192,
+    "precision": 0.9271688170837694,
+    "recall": 0.9345007892982719,
+    "f1": 0.9308203651252194
+  },
+  "per_class": {
+    "background": {
+      "class_id": 0,
+      "support_pixels": 98580016,
+      "predicted_pixels": 98464037,
+      "tp_pixels": 97663414,
+      "fp_pixels": 800623,
+      "fn_pixels": 916602,
+      "present_in_target": true,
+      "present_in_prediction": true,
+      "iou": 0.9827207289339325,
+      "precision": 0.991868878989798,
+      "recall": 0.9907019491658431,
+      "f1_dice": 0.9912850706537182
+    },
+    "Rectangle": {
+      "class_id": 1,
+      "support_pixels": 8138258,
+      "predicted_pixels": 8341152,
+      "tp_pixels": 7794243,
+      "fp_pixels": 546909,
+      "fn_pixels": 344015,
+      "present_in_target": true,
+      "present_in_prediction": true,
+      "iou": 0.8974200496087179,
+      "precision": 0.9344324381092683,
+      "recall": 0.9577286687150985,
+      "f1_dice": 0.9459371421671043
+    },
+    "Rectangle_concave": {
+      "class_id": 2,
+      "support_pixels": 1214746,
+      "predicted_pixels": 1154253,
+      "tp_pixels": 1073000,
+      "fp_pixels": 81253,
+      "fn_pixels": 141746,
+      "present_in_target": true,
+      "present_in_prediction": true,
+      "iou": 0.827932737602421,
+      "precision": 0.9296055544148467,
+      "recall": 0.8833122315282371,
+      "f1_dice": 0.9058678370062629
+    },
+    "circle": {
+      "class_id": 3,
+      "support_pixels": 1762848,
+      "predicted_pixels": 1590071,
+      "tp_pixels": 1457623,
+      "fp_pixels": 132448,
+      "fn_pixels": 305225,
+      "present_in_target": true,
+      "present_in_prediction": true,
+      "iou": 0.7690740654757885,
+      "precision": 0.9167030906167083,
+      "recall": 0.8268568815916063,
+      "f1_dice": 0.8694650840059065
+    },
+    "circle_full": {
+      "class_id": 4,
+      "support_pixels": 3550340,
+      "predicted_pixels": 3696695,
+      "tp_pixels": 3380702,
+      "fp_pixels": 315993,
+      "fn_pixels": 169638,
+      "present_in_target": true,
+      "present_in_prediction": true,
+      "iou": 0.8743949370113748,
+      "precision": 0.9145201321721159,
+      "recall": 0.952219224074314,
+      "f1_dice": 0.9329890086083481
+    }
+  },
+  "confusion_matrix_rows_true_columns_predicted": [
+    [
+      97663414,
+      529205,
+      35157,
+      53582,
+      298658
+    ],
+    [
+      325100,
+      7794243,
+      1580,
+      0,
+      17335
+    ],
+    [
+      61770,
+      1114,
+      1073000,
+      78862,
+      0
+    ],
+    [
+      274276,
+      854,
+      30095,
+      1457623,
+      0
+    ],
+    [
+      139477,
+      15736,
+      14421,
+      4,
+      3380702
+    ]
+  ],
+  "images_evaluated": 432,
+  "elapsed_seconds": 319.3296364589987,
+  "split": "test",
+  "model": "/home/u117134c/Models/Model_v7_scratch_rtx/best_model_v7_instance.keras",
+  "generated_at_utc": "2026-09-14T20:41:51Z",
+  "evaluation_report_schema_version": 3,
+  "report_type": "semantic_segmentation"
+}

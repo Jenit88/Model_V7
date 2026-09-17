@@ -1,0 +1,87 @@
+{
+  "version": "Model_v6.1_v5_augmentation",
+  "dataset_root": "/mnt/c/Users/u117134/Desktop/Data_preprocessing/1000_images/Split_Data",
+  "array_dir": "/home/u117134c/data/pcb_v62_arrays_repaired",
+  "image_size": 512,
+  "preprocessing": "aspect-ratio-preserving letterbox",
+  "letterbox_fill_value": 114,
+  "classes": {
+    "0": "background",
+    "1": "Rectangle",
+    "2": "Rectangle_concave",
+    "3": "circle",
+    "4": "circle_full"
+  },
+  "yolo_to_semantic_id": {
+    "1": 1,
+    "2": 2,
+    "3": 3,
+    "4": 4
+  },
+  "stored_image_dtype": "uint8",
+  "splits": [
+    {
+      "split": "train",
+      "images": 4680,
+      "instances": 151724,
+      "class_pixel_counts": [
+        1044585830,
+        88200697,
+        17427994,
+        28081643,
+        48537756
+      ],
+      "overlapping_pixels": 97062,
+      "images_with_overlap": 330,
+      "destroyed_instances": 0,
+      "files": {
+        "images": "/home/u117134c/data/pcb_v62_arrays_repaired/X_train.npy",
+        "semantic": "/home/u117134c/data/pcb_v62_arrays_repaired/Y_semantic_train.npy",
+        "instance": "/home/u117134c/data/pcb_v62_arrays_repaired/Y_instance_train.npy"
+      },
+      "records": "/home/u117134c/data/pcb_v62_arrays_repaired/train_records.json"
+    },
+    {
+      "split": "val",
+      "images": 1048,
+      "instances": 48388,
+      "class_pixel_counts": [
+        235022560,
+        16625022,
+        2192254,
+        10583834,
+        10303242
+      ],
+      "overlapping_pixels": 16722,
+      "images_with_overlap": 80,
+      "destroyed_instances": 0,
+      "files": {
+        "images": "/home/u117134c/data/pcb_v62_arrays_repaired/X_val.npy",
+        "semantic": "/home/u117134c/data/pcb_v62_arrays_repaired/Y_semantic_val.npy",
+        "instance": "/home/u117134c/data/pcb_v62_arrays_repaired/Y_instance_val.npy"
+      },
+      "records": "/home/u117134c/data/pcb_v62_arrays_repaired/val_records.json"
+    },
+    {
+      "split": "test",
+      "images": 432,
+      "instances": 33488,
+      "class_pixel_counts": [
+        98580016,
+        8138258,
+        1214746,
+        1762848,
+        3550340
+      ],
+      "overlapping_pixels": 15164,
+      "images_with_overlap": 84,
+      "destroyed_instances": 0,
+      "files": {
+        "images": "/home/u117134c/data/pcb_v62_arrays_repaired/X_test.npy",
+        "semantic": "/home/u117134c/data/pcb_v62_arrays_repaired/Y_semantic_test.npy",
+        "instance": "/home/u117134c/data/pcb_v62_arrays_repaired/Y_instance_test.npy"
+      },
+      "records": "/home/u117134c/data/pcb_v62_arrays_repaired/test_records.json"
+    }
+  ]
+}

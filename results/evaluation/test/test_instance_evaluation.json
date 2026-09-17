@@ -1,0 +1,207 @@
+{
+  "images_evaluated": 432,
+  "inference_batch_size": 2,
+  "elapsed_seconds": 319.3296364589987,
+  "images_per_second": 1.3528340331651865,
+  "iou_threshold": 0.5,
+  "matching_method": "maximum-cardinality one-to-one same-class matching",
+  "mask_map50": 0.9730520130632074,
+  "mask_map75": 0.8470291539716946,
+  "mask_map50_95": 0.7554049413903463,
+  "mask_average_precision": {
+    "map50": 0.9730520130632074,
+    "map75": 0.8470291539716946,
+    "map50_95": 0.7554049413903463,
+    "map_by_iou": {
+      "0.50": 0.9730520130632074,
+      "0.55": 0.9705814175551629,
+      "0.60": 0.95736844460202,
+      "0.65": 0.9328756584018204,
+      "0.70": 0.8940280096385036,
+      "0.75": 0.8470291539716946,
+      "0.80": 0.7842515165758629,
+      "0.85": 0.6805566330466228,
+      "0.90": 0.46391397819704666,
+      "0.95": 0.05039258885152152
+    },
+    "iou_thresholds": [
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9,
+      0.95
+    ],
+    "recall_interpolation_points": 101,
+    "active_foreground_classes": 4,
+    "max_detections_per_image": 300,
+    "confidence_source": "mean predicted probability of the decoded instance's class over all pixels in that instance",
+    "matching_method": "confidence-ranked greedy one-to-one same-image same-class mask matching at each IoU threshold",
+    "integration_method": "monotonic precision envelope integrated on 101 recall points",
+    "per_class": {
+      "Rectangle": {
+        "class_id": 1,
+        "ground_truth_instances": 15156,
+        "predicted_instances": 15792,
+        "ap50": 0.9878702189784874,
+        "ap75": 0.9633866131812295,
+        "ap50_95": 0.8300094647084139,
+        "ap_by_iou": {
+          "0.50": 0.9878702189784874,
+          "0.55": 0.9876366895675083,
+          "0.60": 0.9850784625078713,
+          "0.65": 0.9828718947236459,
+          "0.70": 0.9776960864964044,
+          "0.75": 0.9633866131812295,
+          "0.80": 0.9366879421123319,
+          "0.85": 0.8511988989283391,
+          "0.90": 0.5396023463724848,
+          "0.95": 0.08806549421583648
+        }
+      },
+      "Rectangle_concave": {
+        "class_id": 2,
+        "ground_truth_instances": 108,
+        "predicted_instances": 197,
+        "ap50": 0.9285486187349767,
+        "ap75": 0.9127535323429422,
+        "ap50_95": 0.8234613318483082,
+        "ap_by_iou": {
+          "0.50": 0.9285486187349767,
+          "0.55": 0.9285486187349767,
+          "0.60": 0.9285486187349767,
+          "0.65": 0.9232824507341955,
+          "0.70": 0.9127535323429422,
+          "0.75": 0.9127535323429422,
+          "0.80": 0.9127535323429422,
+          "0.85": 0.9037112400290065,
+          "0.90": 0.8171551521472029,
+          "0.95": 0.06655802233891803
+        }
+      },
+      "circle": {
+        "class_id": 3,
+        "ground_truth_instances": 3272,
+        "predicted_instances": 3294,
+        "ap50": 0.9883349414284139,
+        "ap75": 0.5492069399251416,
+        "ap50_95": 0.5649246508328167,
+        "ap_by_iou": {
+          "0.50": 0.9883349414284139,
+          "0.55": 0.9791317422553308,
+          "0.60": 0.9300305425277973,
+          "0.65": 0.8426232627862935,
+          "0.70": 0.7084277074964761,
+          "0.75": 0.5492069399251416,
+          "0.80": 0.3740468761448823,
+          "0.85": 0.1953318561300472,
+          "0.90": 0.0695595383755812,
+          "0.95": 0.012553101258203928
+        }
+      },
+      "circle_full": {
+        "class_id": 4,
+        "ground_truth_instances": 14952,
+        "predicted_instances": 15020,
+        "ap50": 0.9874542731109519,
+        "ap75": 0.9627695304374653,
+        "ap50_95": 0.8032243181718467,
+        "ap_by_iou": {
+          "0.50": 0.9874542731109519,
+          "0.55": 0.9870086196628359,
+          "0.60": 0.9858161546374348,
+          "0.65": 0.9827250253631471,
+          "0.70": 0.9772347122181919,
+          "0.75": 0.9627695304374653,
+          "0.80": 0.913517715703295,
+          "0.85": 0.7719845370990985,
+          "0.90": 0.4293388758929178,
+          "0.95": 0.03439373759312764
+        }
+      }
+    }
+  },
+  "overall": {
+    "tp": 32852,
+    "fp": 1451,
+    "fn": 636,
+    "predicted_instances": 34303,
+    "target_instances": 33488,
+    "precision": 0.9577004926682797,
+    "recall": 0.9810081223124701,
+    "f1": 0.9692142024752548
+  },
+  "macro_foreground": {
+    "precision": 0.8485848947587676,
+    "recall": 0.9647467425803528,
+    "f1": 0.891454750654944,
+    "active_classes": 4
+  },
+  "per_class": {
+    "Rectangle": {
+      "class_id": 1,
+      "tp": 14878,
+      "fp": 914,
+      "fn": 278,
+      "predicted_instances": 15792,
+      "target_instances": 15156,
+      "precision": 0.9421225937183384,
+      "recall": 0.9816574294008973,
+      "f1": 0.9614837792426005
+    },
+    "Rectangle_concave": {
+      "class_id": 2,
+      "tp": 99,
+      "fp": 98,
+      "fn": 9,
+      "predicted_instances": 197,
+      "target_instances": 108,
+      "precision": 0.5025380710659898,
+      "recall": 0.9166666666666666,
+      "f1": 0.6491803278688525
+    },
+    "circle": {
+      "class_id": 3,
+      "tp": 3205,
+      "fp": 89,
+      "fn": 67,
+      "predicted_instances": 3294,
+      "target_instances": 3272,
+      "precision": 0.9729811778992107,
+      "recall": 0.9795232273838631,
+      "f1": 0.9762412427657631
+    },
+    "circle_full": {
+      "class_id": 4,
+      "tp": 14670,
+      "fp": 350,
+      "fn": 282,
+      "predicted_instances": 15020,
+      "target_instances": 14952,
+      "precision": 0.9766977363515313,
+      "recall": 0.9811396468699839,
+      "f1": 0.9789136527425597
+    }
+  },
+  "decoder_thresholds": {
+    "semantic_confidence": 0.3,
+    "center_confidence": 0.1,
+    "center_nms_radius": 2,
+    "maximum_assignment_distance": 51,
+    "boundary_confidence": 0.5,
+    "minimum_instance_area": 13,
+    "minimum_component_area_fraction": 0.1,
+    "fallback_instance_score": 0.05,
+    "minimum_boundary_core_area": 6,
+    "maximum_centers_per_class": 150
+  },
+  "split": "test",
+  "model": "/home/u117134c/Models/Model_v7_scratch_rtx/best_model_v7_instance.keras",
+  "generated_at_utc": "2026-09-14T20:41:51Z",
+  "evaluation_report_schema_version": 3,
+  "report_type": "instance_segmentation"
+}

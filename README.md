@@ -1,13 +1,12 @@
-
 # Model_v7
 
 **Successor line to Model V6.2.** Replaces the centre-heatmap + offset-vector
 instance representation with a single **normalised inner-distance field**, and
 adds tiled inference for objects the 512² letterbox cannot resolve.
 
-> **Status: not trained.** Every contract below passes on CPU, the model builds,
-> and no training run has ever been started. There is no V7 checkpoint. Read
-> [What is not done](#what-is-not-done) before spending GPU time on it.
+> **Status: trained.** 120 epochs from scratch, 11–14 Sep 2026. The released model is the
+> epoch-105 checkpoint: test mask mAP50-95 **0.7554**, F1 **0.9692**. See [Results](#results).
+> The sections after Results were written before the training run and are kept as the design record.
 
 | | |
 |---|---|
@@ -17,6 +16,22 @@ adds tiled inference for objects the 512² letterbox cannot resolve.
 | Outputs | full-res semantic · **half-res inner distance (1 ch)** · full-res instance boundary |
 | Classes | `Rectangle`, `Rectangle_concave`, `circle`, `circle_full` |
 | Lineage | forked from `model_v6_2.py` on 2026-09-08, when the V6.2 Tier-1 run launched |
+
+## Results
+
+Trained from scratch for 120 epochs. The released model is the epoch-105 checkpoint, chosen on the
+complete validation split; the test split was not used for training or for choosing it.
+
+| split | images | objects | mask mAP50-95 | mAP50 | mAP75 | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| validation | 1,048 | 48,388 | **0.8515** | 0.9874 | 0.9712 | 0.9598 | 0.9839 | **0.9717** |
+| test | 432 | 33,488 | **0.7554** | 0.9731 | 0.8470 | 0.9577 | 0.9810 | **0.9692** |
+
+Precision, recall and F1 count a mask as correct at IoU ≥ 0.50. The weakest spot on test is
+`Rectangle_concave` precision, 0.50 (98 false positives against 108 objects).
+
+- Per-class tables, training logs, evaluation reports and example predictions: [`results/`](results/README.md)
+- Trained model file: [Releases](https://github.com/Jenit88/Model_V7/releases)
 
 ## Why the representation changed
 
@@ -92,6 +107,11 @@ test (blur + noise) earned its keep:
 tiles by cosine taper and decode once over the result, rather than decoding each
 tile and merging instances across a seam.
 
+> **Reviewed and revised 2026-09-10.** Nine changes, validated head-to-head on real
+> validation images: the instance score, the grouping rule, and the loss weight for the
+> inner-distance head were all wrong. Full evidence in
+> [`Change/CHANGE_REPORT.md`](Change/CHANGE_REPORT.md). The list below is what remains.
+
 ## What is not done
 
 Read this before committing GPU time. Nothing here is speculative — each was
@@ -109,13 +129,13 @@ measured or traced in the code.
 2. **Tier 3 is not wired.** `predict_fields_tiled` is called only from
    `test_tier3_tiling.py`; `TILE_INFERENCE_ENABLED = True` is read nowhere.
 3. **The decoders still run at half resolution** (`INSTANCE_HEAD_SIZE =
-   IMG_SIZE // 2`), so the resolution change Tier 3 exists for has not happened.
-   The `circle` assertion in `test_tier2_grouping.py:224` is disabled pending it —
-   at 256² a test-split `circle` is a ring ~1.5 px thick, whose core is a
-   sub-pixel-wide dotted line. **No threshold, closing or area rule recovers
-   information the resolution never carried**, so replacing the grouping will not
-   fix `circle` without the resolution change alongside it. That pairing used to
-   be argued from the memory budget; it is now measured.
+   IMG_SIZE // 2`). The `circle` assertion in `test_tier2_grouping.py:224` is
+   disabled pending a resolution change — but **measured on the test split, only
+   3.1% of `circle`, 3.9% of `Rectangle` and 2.3% of `circle_full` instances lack
+   a usable core at head resolution, and 1–2% are degenerate.** The 1.5 px annulus
+   in the synthetic test is a worst case, not the common one, so Tier 3 is worth a
+   few per cent of objects rather than the step change it was scoped as. Plan
+   against that number.
 4. **The recorded training config misdescribes the model.** It still emits
    `"offset": {"name": "MaskedOffsetPixelHuberLoss"}` and lists `center`/`offset`
    in `head_weights` while omitting `inner_distance`. The actual `compile()` is
@@ -225,6 +245,7 @@ predict_folder.py       sample a folder, report the score distribution
 predict_pictures.py     overlays only, resumable
 dashboard.py            live dashboard on :8088
 
+results/README.md             training outputs, evaluation reports, example predictions
 results/threshold_fit.json    fitted thresholds, inherited from V6.2
 memory/                       the dataset audit and the uplift plan
 ```
