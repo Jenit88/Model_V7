@@ -104,6 +104,6 @@ The released model on three test images, run with the deployment settings (detec
 
 ## Caveats
 
-- 44 test images are byte-identical to validation images, and validation chose the checkpoint, so the test split is not fully independent. See [the main README](../README.md#caveats-inherited-from-the-v62-measurements).
+- 44 test images are byte-identical to validation images, and validation chose the checkpoint, so the test split is not fully independent. See [the main README](../README.md#limitations-and-things-to-know).
 - `TRAINING_REPORT.md` and `instance_checkpoint_history.json` score a 256-image validation subset during training (0.8501 at epoch 105). The tables above are the final evaluations on the complete splits.
 - The examples use a confidence floor of 0.50 with no V7-specific threshold fit; the benchmark numbers use the shipped decoder settings.

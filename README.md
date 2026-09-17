@@ -1,278 +1,267 @@
-# Model_v7
+# Model V7: finding shapes on PCB images
 
-**Successor line to Model V6.2.** Replaces the centre-heatmap + offset-vector
-instance representation with a single **normalised inner-distance field**, and
-adds tiled inference for objects the 512² letterbox cannot resolve.
+Model V7 looks at a photo of a printed circuit board (PCB) and finds four kinds of shapes on it. For every shape it finds, it gives you:
 
-> **Status: trained.** 120 epochs from scratch, 11–14 Sep 2026. The released model is the
-> epoch-105 checkpoint: test mask mAP50-95 **0.7554**, F1 **0.9692**. See [Results](#results).
-> The sections after Results were written before the training run and are kept as the design record.
+- the **class**: which of the four kinds it is
+- the **outline**: the exact pixels the shape covers, not just a box around it
+- a **confidence score** from 0 to 1
 
-| | |
-|---|---|
-| Model file | `model_v7.py` |
-| Parameters | 6,343,486 (V6.2: 6,417,683) |
-| Input | 512×512, aspect-ratio-preserving letterbox |
-| Outputs | full-res semantic · **half-res inner distance (1 ch)** · full-res instance boundary |
-| Classes | `Rectangle`, `Rectangle_concave`, `circle`, `circle_full` |
-| Lineage | forked from `model_v6_2.py` on 2026-09-08, when the V6.2 Tier-1 run launched |
+The model was trained from scratch and is ready to use. Download the trained model file from the [Releases page](https://github.com/Jenit88/Model_V7/releases).
+
+![Model V7 result on a test image](results/examples/sample_val_000017.png)
+
+*Model V7 on a test image. Every shape it found is outlined and labelled with a number, its class and its confidence.*
+
+## Contents
+
+1. [What the model finds](#what-the-model-finds)
+2. [Results](#results)
+3. [How it works](#how-it-works)
+4. [How it was trained](#how-it-was-trained)
+5. [Use the trained model](#use-the-trained-model)
+6. [Check the scores yourself](#check-the-scores-yourself)
+7. [Train your own model](#train-your-own-model)
+8. [Run the tests](#run-the-tests)
+9. [Limitations and things to know](#limitations-and-things-to-know)
+10. [Files in this repository](#files-in-this-repository)
+
+## What the model finds
+
+| class | shape | shapes in the test set |
+|---|---|---:|
+| `Rectangle` | rectangular pad | 15,156 |
+| `Rectangle_concave` | rectangle with a hollow or cut-out part | 108 |
+| `circle` | ring: a circle with a hole in the middle | 3,272 |
+| `circle_full` | solid circle | 14,952 |
 
 ## Results
 
-Trained from scratch for 120 epochs. The released model is the epoch-105 checkpoint, chosen on the
-complete validation split; the test split was not used for training or for choosing it.
+The model was scored on pictures it never trained on:
 
-| split | images | objects | mask mAP50-95 | mAP50 | mAP75 | precision | recall | F1 |
+- **validation set**, 1,048 images: used to pick the best version of the model
+- **test set**, 432 images: kept aside and used only at the very end
+
+| data | images | shapes | mask mAP50-95 | mAP50 | mAP75 | precision | recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | validation | 1,048 | 48,388 | **0.8515** | 0.9874 | 0.9712 | 0.9598 | 0.9839 | **0.9717** |
 | test | 432 | 33,488 | **0.7554** | 0.9731 | 0.8470 | 0.9577 | 0.9810 | **0.9692** |
 
-Precision, recall and F1 count a mask as correct at IoU ≥ 0.50. The weakest spot on test is
-`Rectangle_concave` precision, 0.50 (98 false positives against 108 objects).
+On the test set, per class:
 
-- Per-class tables, training logs, evaluation reports and example predictions: [`results/`](results/README.md)
-- Trained model file: [Releases](https://github.com/Jenit88/Model_V7/releases)
+| class | shapes | mask mAP50-95 | precision | recall |
+|---|---:|---:|---:|---:|
+| Rectangle | 15,156 | 0.8300 | 0.9421 | 0.9817 |
+| Rectangle_concave | 108 | 0.8235 | 0.5025 | 0.9167 |
+| circle | 3,272 | 0.5649 | 0.9730 | 0.9795 |
+| circle_full | 14,952 | 0.8032 | 0.9767 | 0.9811 |
 
-## Why the representation changed
+**What the numbers mean.** All scores go from 0 to 1, and higher is better.
 
-The offset head asked every pixel to emit a vector to its object's centre. That
-is inherently scale-dependent: a pixel on a 130 px object must emit a vector an
-order of magnitude longer than one on a 16 px object, and the head was only ever
-trained on the short end. **Measured on real boards, 30.1% of `Rectangle`s sit
-beyond anything training produced** — and those are exactly the objects that
-shatter into strips.
+- **IoU (overlap):** how much a predicted outline and the real outline cover the same pixels. 1 means identical.
+- **Precision:** of the shapes the model found, the share that are real.
+- **Recall:** of the real shapes, the share the model found.
+- **F1:** one number that balances precision and recall.
+- Precision, recall and F1 count a found shape as correct when its IoU with a real shape is at least 0.50.
+- **mask mAP50** and **mAP75:** average precision when a match needs an IoU of at least 0.50 or 0.75.
+- **mask mAP50-95:** the same, averaged over ten levels from 0.50 to 0.95. It rewards outlines that fit exactly.
 
-A normalised inner distance has no such range. It runs 0 at the rim to 1 at the
-innermost pixel of every object **regardless of size**, which is the property the
-offset field never had. One distance transform serves every instance: a pixel
-counts as an edge if it is background or 4-adjacent to a different instance id,
-so the transform measures each object's distance to its own boundary, shared
-boundaries included.
+**In short:** the model finds almost every shape (recall 0.98), and nearly everything it reports is real (precision 0.96). What is left to improve is mostly how exactly the outlines fit, plus the weak spots listed under [Limitations](#limitations-and-things-to-know).
 
-What that removes, by construction rather than by threshold:
+Full tables, training logs, evaluation reports and more example pictures are in [`results/`](results/README.md).
 
-| gone | why it mattered |
-|---|---|
-| the 51-head-pixel assignment cap | a large object's outer pixels were unassignable however good the prediction |
-| the unassigned residue, and therefore **the whole fallback path** | it produced 75 false positives against 2 true positives on validation |
-| centre peaks, and `CENTER_CONFIDENCE_THRESHOLD` | its 0.10 default admitted a spurious low-confidence duplicate on top of most real pads |
+## How it works
 
-## Quick start
+**1. Resize.** The picture is scaled to 512 × 512 pixels without stretching. Grey bars fill any empty space.
+
+**2. Predict three maps.** One neural network (6.3 million parameters) reads the picture and outputs three maps:
+
+| map | size | what it gives for each pixel |
+|---|---|---|
+| class map | 512 × 512 | background or one of the four classes, with a probability |
+| edge map | 512 × 512 | how likely the pixel is on the edge of a shape |
+| inner-distance map | 256 × 256 | 0 at the edge of a shape, rising to 1 in its middle |
+
+The inner-distance map is the main idea. Every shape, big or small, looks the same in it: low at the edge, high in the middle. So each shape's middle is easy to find, even when two shapes touch.
+
+**3. Turn the maps into shapes.** For each class:
+
+1. Keep the pixels the network is at least 30% sure about. Pixels that touch form a blob.
+2. In each blob, the high part of the inner-distance map (at least half of the blob's highest value) marks the middle of each shape. Each middle becomes one shape.
+3. Every other pixel in the blob joins its nearest middle.
+4. The edge map separates shapes that are still stuck together.
+5. Very small pieces (under 13 pixels) are thrown away.
+
+**4. Score each shape.** The confidence score checks whether the predicted inner-distance map fits the shape's own outline, then multiplies that by how sure the network is about the class. A clean, whole shape scores high. A broken piece, or two shapes merged into one, scores lower.
+
+**5. Scale back.** The outlines are mapped back to the size of the original picture.
+
+**Inside the network:** the first layers look at both the colours and the edges of the picture (a fixed Sobel edge filter). An encoder then shrinks the picture step by step to learn bigger patterns. A feature pyramid (BiFPN) mixes fine and coarse detail. Two decoders build the maps: one makes the class map and the edge map, the other makes the inner-distance map.
+
+## How it was trained
+
+- **Data:** 4,680 training images (151,724 shapes), 1,048 validation images (48,388 shapes) and 432 test images (33,488 shapes). The labels are polygons in YOLO format. Where two label polygons overlapped, the overlap was cleaned up before training so every shape keeps its own pixels.
+- **From scratch:** the network started with random weights. No pretrained weights were used.
+- **Length:** 120 epochs (full passes over the training images), 11–14 September 2026, on one laptop GPU (NVIDIA RTX PRO 1000, 8 GB). One epoch takes about 34 minutes.
+- **Augmentation:** each epoch shows the training images changed in different ways: rotations, flips, small zooms in and out, and changes to brightness, contrast, colour, blur and noise. This stops the model from relying on one exact view.
+- **Loss:** one loss for each of the three maps. The inner-distance loss pays extra attention to pixels near the edges of shapes.
+- **Settings:** AdamW optimiser. Learning rate 0.0003 with a 6-epoch warm-up, then lowered slowly to 0.000001 (cosine schedule). 2 images per step, with gradients added up over 2 steps (works like 4 images per step). Mixed precision (float16) to save GPU memory. A running average of the weights (EMA, 0.999).
+- **Picking the best version:** from epoch 25, every 5 epochs the model was scored on 256 validation images and the best version so far was saved. At the end, three saved versions were compared on all 1,048 validation images. The version from **epoch 105** won; it is the released model.
+
+## Use the trained model
+
+**You need:** Linux, or Windows with WSL2 (Ubuntu); Python 3.11; an NVIDIA GPU (strongly recommended).
+
+**1. Get the code and install the packages.**
 
 ```bash
-cd /mnt/c/Users/u117134/Desktop/dev/Model_v7
-
-./run_v7_tests.sh          # all four contract suites, CPU-only, ~3 min
-./run.sh selftest          # the model's own 11-check self-test
+git clone https://github.com/Jenit88/Model_V7.git
+cd Model_V7
+python3.11 -m venv ~/envs/pcb62
+~/envs/pcb62/bin/pip install "tensorflow[and-cuda]==2.21.0" "keras==3.15.1" "numpy==2.4.6" "opencv-python-headless==5.0.0.93"
 ```
 
-Both run on CPU deliberately — these are decode, target and geometry contracts,
-none of which depend on the accelerator, and the GPU should stay free.
+`env.sh` looks for the Python environment in `~/envs/pcb62`. If you made it somewhere else, run `export PCB_ENV=/your/env/folder` first.
 
-## What is done
-
-**Tier 2 — the head swap. Complete and wired.**
-
-| piece | where |
-|---|---|
-| `build_inner_distance_target` | 1 channel of per-instance normalised distance + 1 validity mask |
-| `MaskedInnerDistanceLoss` | masked Huber, rim-weighted so the boundary is not drowned by the flat interior |
-| `watershed_instances` | replaces `nearest_center_assignments`; seeds from the field's own high ground |
-| `build_model_v7_instance` | `center` + `offset` heads replaced by one `inner_distance` output |
-| `decode_instances` | same return signature, so every call site kept working |
-
-The model, the target generator, the loss, the compile weights and all five
-`build_all_targets` call sites agree.
-
-**Three defects the tests found, which is the point of writing them first.** The
-oracle test passed at IoU 1.000 immediately and taught nothing; the degradation
-test (blur + noise) earned its keep:
-
-1. **Speckle over-segmentation** — 2 objects became 15. Every speck seeds an
-   instance, and because seeds expand by nearest-core, each speck grows into a
-   full-sized object the area filter cannot catch. Fixed by filtering **cores**
-   before expansion.
-2. **Smoothing is the wrong tool**, and it was in the first draft. A sweep showed
-   sigma 1.0 buys two units of noise robustness and destroys the annulus every
-   time, because a 3 px ring's core is one pixel wide. Now 0, with the sweep
-   table in the constant's comment.
-3. **Global thresholding was a hidden assumption** — it assumes the prediction
-   preserves the normalisation, so an under-predicted object gets no core and its
-   pixels are handed to its **neighbour**. A blurred 16 px disc vanished into an
-   adjacent 130 px rectangle. Thresholding relative to each blob's own maximum
-   fixed that.
-
-**Tier 3 — tiled inference. Implemented and tested, not connected.**
-`tile_grid`, `_tile_blend_weight` and `predict_fields_tiled` stitch overlapping
-tiles by cosine taper and decode once over the result, rather than decoding each
-tile and merging instances across a seam.
-
-> **Reviewed and revised 2026-09-10.** Nine changes, validated head-to-head on real
-> validation images: the instance score, the grouping rule, and the loss weight for the
-> inner-distance head were all wrong. Full evidence in
-> [`Change/CHANGE_REPORT.md`](Change/CHANGE_REPORT.md). The list below is what remains.
-
-## What is not done
-
-Read this before committing GPU time. Nothing here is speculative — each was
-measured or traced in the code.
-
-1. **The ranking signal is near-degenerate.** `decode_instances` scores each
-   instance with `max(distance_full[candidate])`. But the target normalises every
-   instance's peak to exactly 1.0, and `watershed_instances` guarantees every
-   returned instance contains a core. Fed the **oracle** field, a 4-object scene
-   decodes to scores `0.8593, 0.9863, 1.0000, 1.0000` — a 0.14 spread that comes
-   from 256→512 upsampling smoothing small peaks, not from instance quality. It
-   ranks by size, worst for small objects. mAP is rank-sensitive, and a
-   deployment confidence floor would have nothing to bite on. **Fix this before
-   training.**
-2. **Tier 3 is not wired.** `predict_fields_tiled` is called only from
-   `test_tier3_tiling.py`; `TILE_INFERENCE_ENABLED = True` is read nowhere.
-3. **The decoders still run at half resolution** (`INSTANCE_HEAD_SIZE =
-   IMG_SIZE // 2`). The `circle` assertion in `test_tier2_grouping.py:224` is
-   disabled pending a resolution change — but **measured on the test split, only
-   3.1% of `circle`, 3.9% of `Rectangle` and 2.3% of `circle_full` instances lack
-   a usable core at head resolution, and 1–2% are degenerate.** The 1.5 px annulus
-   in the synthetic test is a worst case, not the common one, so Tier 3 is worth a
-   few per cent of objects rather than the step change it was scoped as. Plan
-   against that number.
-4. **The recorded training config misdescribes the model.** It still emits
-   `"offset": {"name": "MaskedOffsetPixelHuberLoss"}` and lists `center`/`offset`
-   in `head_weights` while omitting `inner_distance`. The actual `compile()` is
-   correct — only the record is wrong.
-5. **The V5-transfer validator was broken by a blind rename** — it demands an
-   `inner_distance` layer from a V5 source, while the comment above it still
-   talks about centre and offset heads. Dead path (scratch-init only), but
-   unreviewed.
-6. **`minimum_core_area` filters globally, not per blob.** If any core clears the
-   floor, every sub-floor core is dropped; a blob that loses its core has its
-   pixels handed to the nearest *other* core, because expansion is Euclidean with
-   no connectivity constraint and the old 51 px cap is gone. That is defect 3
-   above returning through a different door, and it can produce spatially
-   disconnected masks.
-
-## Tests
+**2. Download the trained model** (`best_model_v7_instance.keras`, 231 MB) into `~/Models/Model_v7_scratch_rtx/`:
 
 ```bash
-./run_v7_tests.sh
+mkdir -p ~/Models/Model_v7_scratch_rtx
+gh release download v1.0 --repo Jenit88/Model_V7 --dir ~/Models/Model_v7_scratch_rtx
 ```
 
-| suite | what it holds |
-|---|---|
-| `run_selftest_v7` | the model's own 11 contracts: decode, targets, ranking, augmentation, the build |
-| `test_tier2_grouping` | grouping under blur + noise, across scale extremes, touching pads, thin annuli, frame truncation, dense small pads |
-| `test_tier2_loss` | the masked, rim-weighted Huber |
-| `test_tier3_tiling` | tile coverage and seams, including a real forward pass |
+You can also download it from the [Releases page](https://github.com/Jenit88/Model_V7/releases) in a browser. To keep it in another folder, run `export PCB_MODEL_OUTPUT_DIR=/that/folder`.
 
-Seams matter more than they look: a visible one is read by the decoder as a
-boundary, so it manufactures instance splits exactly where two tiles meet —
-which would look like an over-segmentation bug anywhere except its actual cause.
-
-`sweep_tier2_params.py` sweeps the grouping constants over the same scenes.
-
-## Training
-
-Same measured laptop configuration as V6.2 — batch 2 × 2 accumulation,
-`mixed_float16`, cosine LR 3e-4, ~35 min/epoch on the RTX PRO 1000 8 GB.
+**3. Check that TensorFlow can see the GPU.**
 
 ```bash
-./run.sh selftest              # ~1 min, no dataset/GPU needed
-./session.sh start prepare     # one-off, if the arrays do not exist yet
-./session.sh start scratch     # the training run
-./session.sh attach            # watch it   (detach: Ctrl-b then d)
-```
-
-**Verify the GPU is real before starting**, because TensorFlow falls back to the
-CPU silently here:
-
-```bash
-source ./env.sh
+source env.sh
 $PCB_PYTHON -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 ```
 
-Full environment, dataset layout, crash recovery, evaluation, threshold fitting
-and deployment work exactly as documented in the V6.2 repository's README — this
-project is a copy of that infrastructure. The differences are below.
+If this prints `[]`, TensorFlow cannot see the GPU and will not use it.
 
-### This project keeps its own identity, so the two never collide
+**4. Find shapes in your pictures.**
 
-| | V6.2 project | this project |
-|---|---|---|
-| launcher | `train_rtx.py` | **`train_v7.py`** |
-| tmux session | `pcb` | **`v7`** |
-| supervisor | `pcb_supervisor.sh` | **`v7_supervisor.sh`** |
-| logon task | `PCB-v62-training-supervisor` | **`Model-v7-training-supervisor`** |
-| supervisor's wrapper session | `pcbsup` | **`v7sup`** |
-| default output | `~/Models/Model_v6_2_scratch_rtx` | **`~/Models/Model_v7_scratch_rtx`** |
+To save a result picture for every image in a folder (needs a GPU):
 
-That separation is not cosmetic. The watchdog and supervisor identify the job by
-matching its process line; with both projects using `train_rtx.py`, one
-project's watchdog would answer to the other's run. Prepared arrays are shared
-(`~/data/pcb_v62_arrays_repaired`) because the array format is unchanged — the
-inner-distance target is built from the same semantic and instance rasters.
-
-> tmux resolves a target session by **prefix**, so `-t v7` also matches `v7sup`.
-> Every target in `session.sh`, `watchdog.sh` and `v7_supervisor.sh` uses `=v7`
-> to force an exact match. Removing that makes a logon resume silently do
-> nothing — it happened on 10-09 in the V6.2 project.
-
-## Layout
-
-```
-model_v7.py             the model — every stage lives here
-train_v7.py             measured laptop configuration + benchmark harness
-run.sh                  single entry point for every mode
-env.sh                  environment; MUST be sourced before any Python
-session.sh              detached tmux session 'v7'
-watchdog.sh             restart on process death (inside WSL)
-v7_supervisor.sh        restart after host reboot (Windows logon task)
-register_v7_watchdog.ps1
-active_run.env          which run the supervisors keep alive
-
-run_v7_tests.sh         all four contract suites
-run_selftest_v7.py      the model's own self-test, on CPU
-test_tier2_grouping.py  watershed grouping under degradation
-test_tier2_loss.py      the inner-distance loss
-test_tier3_tiling.py    tile coverage and seams
-sweep_tier2_params.py   grouping constant sweep
-
-tta.py                  dihedral TTA + algebra self-check
-tta_v7.py               the V7 field conventions for TTA
-deployment.py           the real-board operating point
-reevaluate.py           re-score a checkpoint with the current decoder
-fit_thresholds.py       split-validated decoder threshold search
-predict_folder.py       sample a folder, report the score distribution
-predict_pictures.py     overlays only, resumable
-dashboard.py            live dashboard on :8088
-
-results/README.md             training outputs, evaluation reports, example predictions
-results/threshold_fit.json    fitted thresholds, inherited from V6.2
-memory/                       the dataset audit and the uplift plan
+```bash
+source env.sh
+$PCB_PYTHON predict_pictures.py /path/to/images /path/to/output
 ```
 
-## Where to start
+Each image gets a result picture with the same name in `/path/to/output`. If the run stops, start it again: finished images are skipped.
 
-In order, and the first one is not optional:
+To try the model on a random sample of a folder (also works without a GPU, just slower):
 
-1. **Fix the ranking signal.** Training against a score that cannot order
-   detections wastes the run — mAP is computed from that ordering.
-2. **Wire tiled inference**, or delete `TILE_INFERENCE_ENABLED` so it stops
-   claiming to be on.
-3. **Decide the resolution question.** Full-resolution decoders and tiling
-   address the same defect from two directions; `circle` needs one of them.
-4. Correct the recorded training config, then train.
+```bash
+PCB_SOURCE=/path/to/images PCB_PREDICT_OUT=/path/to/output PCB_SAMPLE=40 ./run.sh predict-folder
+```
 
-## Caveats inherited from the V6.2 measurements
+This picks 40 random images. It saves the result pictures in `/path/to/output/overlays/` and a `summary.json` with the number of shapes per class and how the confidence scores are spread. The full results for each image are in `~/Models/Model_v7_scratch_rtx/predictions/` (this folder is emptied at the start of every run):
 
-1. 44 images are byte-identical between val and test (10% of test), and decoder
-   thresholds are fitted on val.
-2. Test is not train: objects are ~0.6× the diameter and 2.4× as dense.
-3. `Rectangle_concave` has 680 training polygons. No architecture change
-   substitutes for more labels.
-4. `results/threshold_fit.json` was fitted for the **centre/offset** decoder.
-   All five constants still exist in `model_v7.py` — they are kept for the
-   retained `decode_instances_centre_offset` path — so `deployment.py` applies
-   them without error. But `center_confidence` and `center_nms_radius` are
-   **inert** for the V7 decoder, which has no centre head, and the remaining
-   three were tuned against a different grouping rule. Refit on validation
-   before trusting any of them, and treat a silent success here as a warning.
+| file | contents |
+|---|---|
+| `instances.png` | the picture with every shape outlined and labelled |
+| `instances.json` | every shape: class, confidence, size and position |
+| `instance_ids.npy` | for each pixel, the number of the shape it belongs to |
+| `semantic_ids.npy`, `semantic_colour.png` | for each pixel, its class |
+| `semantic_confidence.png`, `boundary.png`, `inner_distance.png` | the network's maps as heat maps |
+
+Both scripts drop shapes with a confidence below **0.50**. To change that, put `PCB_MIN_CONFIDENCE=0.3` (or another value) in front of the command. To keep every shape, put `PCB_DEPLOYMENT_PROFILE=0` in front of it.
+
+## Check the scores yourself
+
+You need the labelled dataset, prepared as described in [Train your own model](#train-your-own-model) (steps 1 and 2). Then run:
+
+```bash
+./run.sh reevaluate
+```
+
+This scores the model on the validation and test sets, prints a table and saves the numbers in `results/reevaluation_reeval.json`. Full reports go to `~/Models/Model_v7_scratch_rtx/performance/`. Put `PCB_USE_TTA=1` in front of the command to average each prediction over 8 flipped and rotated copies of the image (slower).
+
+## Train your own model
+
+**1. Arrange the dataset like this:**
+
+```text
+Split_Data/
+├── images/
+│   ├── train/     pictures (.png, .jpg, ...)
+│   ├── val/
+│   └── test/
+└── labels/
+    ├── train/     one .txt file per picture, with the same name
+    ├── val/
+    └── test/
+```
+
+Each line in a label file is one shape in YOLO polygon format: the class number, then the polygon's x and y points, scaled from 0 to 1. For example:
+
+```text
+4 0.412 0.550 0.418 0.548 0.423 0.556 0.415 0.561
+```
+
+Class numbers: 1 = `Rectangle`, 2 = `Rectangle_concave`, 3 = `circle`, 4 = `circle_full`.
+
+**2. Prepare the data.** Open `env.sh` and set `PCB_DATASET_ROOT` to your `Split_Data` folder. Then run:
+
+```bash
+./run.sh prepare
+```
+
+This converts the pictures and labels into arrays (about 10 GB) in the folder set by `PCB_ARRAY_DIR` in `env.sh`. Keep them on a fast Linux disk: reading them from a Windows drive (`/mnt/c`) is much slower.
+
+**3. Train.** Use a new, empty output folder:
+
+```bash
+export PCB_MODEL_OUTPUT_DIR=~/Models/my_v7_run
+./session.sh start scratch
+```
+
+Training runs in the background inside tmux (install `tmux` first). While it runs:
+
+- `./session.sh attach` shows the training (press Ctrl-b, then d, to leave it running)
+- `./session.sh status` shows a short summary
+- `./run.sh report` prints the progress so far
+- the live dashboard is at http://localhost:8088 and TensorBoard at http://localhost:6006
+
+You can also run `./run.sh scratch` to train in the current terminal instead. 120 epochs take about 3 days on an 8 GB laptop GPU. When training ends, the best version is saved as `best_model_v7_instance.keras` in the output folder and scored on the validation and test sets.
+
+## Run the tests
+
+```bash
+./run_v7_tests.sh    # six test suites on the CPU, no dataset needed
+./run.sh selftest    # the model's built-in self-test
+```
+
+## Limitations and things to know
+
+- **A single Rectangle among many round pads is often missed.** In the 20 test images with 1 `Rectangle` and 71 `circle_full`, the model missed the `Rectangle` in 10.
+- **False `Rectangle_concave` detections.** On the test set, the model reported 98 wrong `Rectangle_concave` shapes against 108 real ones (precision 0.50). Most of them are on images that contain only 3 shapes.
+- **Ring-shaped `circle` outlines are less exact.** `circle` has a mask mAP75 of 0.55, against 0.91 to 0.96 for the other classes. The inner-distance map is predicted at 256 × 256, where a thin ring is only 1 to 2 pixels wide.
+- **Large pictures lose detail.** Every picture is shrunk to 512 × 512 first, so very small shapes on a large photo are harder to find. Code for predicting tile by tile at full resolution is included (`predict_fields` in `model_v7.py`), but the prediction scripts do not use it yet.
+- **The decoding thresholds have not been tuned for this model.** Run `./run.sh fit-thresholds` to search for better values on the validation set. It saves them to `results/threshold_fit_v7.json`, and the prediction scripts then use them automatically.
+- **The test set is not fully independent.** 44 test images are identical to validation images, and the validation set chose the best version.
+- **Test pictures differ from training pictures.** In the test images, shapes are about 0.6× the size and 2.4× more tightly packed than in the training images.
+- **`Rectangle_concave` is rare.** Only about 680 of the 151,724 training shapes belong to it.
+- **Folder paths.** `env.sh` contains folder paths from the computer the model was trained on. Change them, or set the `PCB_*` variables, to match your computer.
+
+## Files in this repository
+
+| file | what it is |
+|---|---|
+| `model_v7.py` | the whole model: data preparation, network, training, prediction and evaluation |
+| `train_v7.py` | training settings for an 8 GB GPU (used by `run.sh`) |
+| `run.sh` | one command for every task: `selftest`, `prepare`, `scratch`, `report`, `predict-folder`, `reevaluate`, `fit-thresholds` and more |
+| `env.sh` | environment setup, loaded by `run.sh` |
+| `session.sh` | runs a long job in the background with tmux |
+| `dashboard.py` | live training dashboard |
+| `predict_pictures.py` | finds shapes in a folder of pictures and saves result pictures |
+| `predict_folder.py` | the same on a random sample, plus a summary of the scores |
+| `deployment.py` | settings for real boards (the 0.50 confidence cut-off) |
+| `reevaluate.py` | scores the model on the validation and test sets |
+| `fit_thresholds.py` | searches for better decoding thresholds |
+| `tta.py`, `tta_v7.py` | averages predictions over flipped and rotated copies (test-time augmentation) |
+| `run_v7_tests.sh`, `run_selftest_v7.py`, `test_*.py` | tests |
+| `results/` | training outputs, evaluation reports, per-image results and example pictures |
+| `TRAINING.md`, `change.md`, `change_2.md`, `inspection.md` | development notes, written before the final training run |
