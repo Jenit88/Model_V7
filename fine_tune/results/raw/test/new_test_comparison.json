@@ -1,0 +1,366 @@
+{
+  "all_664": {
+    "finetuned_epoch54": {
+      "images": 664,
+      "mask_map50_95": 0.7150370665576111,
+      "mask_map50": 0.8169645007760287,
+      "mask_map75": 0.7934811693147898,
+      "precision": 0.8457869634340223,
+      "recall": 0.9139046079223929,
+      "f1": 0.8785273689834378,
+      "tp": 9044,
+      "fp": 1649,
+      "fn": 852,
+      "per_class_ap": {
+        "Rectangle": {
+          "class_id": 1,
+          "tp": 4588,
+          "fp": 755,
+          "fn": 312,
+          "predicted_instances": 5343,
+          "target_instances": 4900,
+          "precision": 0.8586936178177054,
+          "recall": 0.9363265306122449,
+          "f1": 0.8958312994239969
+        },
+        "Rectangle_concave": {
+          "class_id": 2,
+          "tp": 165,
+          "fp": 150,
+          "fn": 275,
+          "predicted_instances": 315,
+          "target_instances": 440,
+          "precision": 0.5238095238095238,
+          "recall": 0.375,
+          "f1": 0.4370860927152318
+        },
+        "circle": {
+          "class_id": 3,
+          "tp": 1165,
+          "fp": 370,
+          "fn": 223,
+          "predicted_instances": 1535,
+          "target_instances": 1388,
+          "precision": 0.758957654723127,
+          "recall": 0.8393371757925072,
+          "f1": 0.7971262401642148
+        },
+        "circle_full": {
+          "class_id": 4,
+          "tp": 3126,
+          "fp": 374,
+          "fn": 42,
+          "predicted_instances": 3500,
+          "target_instances": 3168,
+          "precision": 0.8931428571428571,
+          "recall": 0.9867424242424242,
+          "f1": 0.937612477504499
+        }
+      },
+      "semantic_foreground_miou": null,
+      "minutes": 6.6
+    },
+    "original_epoch105": {
+      "images": 664,
+      "mask_map50_95": 0.5239631794377686,
+      "mask_map50": 0.6836683387023754,
+      "mask_map75": 0.59492651384966,
+      "precision": 0.6551502490760084,
+      "recall": 0.8239692805173807,
+      "f1": 0.7299257004744427,
+      "tp": 8154,
+      "fp": 4292,
+      "fn": 1742,
+      "per_class_ap": {
+        "Rectangle": {
+          "class_id": 1,
+          "tp": 3918,
+          "fp": 1752,
+          "fn": 982,
+          "predicted_instances": 5670,
+          "target_instances": 4900,
+          "precision": 0.691005291005291,
+          "recall": 0.7995918367346939,
+          "f1": 0.7413434247871334
+        },
+        "Rectangle_concave": {
+          "class_id": 2,
+          "tp": 118,
+          "fp": 611,
+          "fn": 322,
+          "predicted_instances": 729,
+          "target_instances": 440,
+          "precision": 0.16186556927297668,
+          "recall": 0.2681818181818182,
+          "f1": 0.2018819503849444
+        },
+        "circle": {
+          "class_id": 3,
+          "tp": 1063,
+          "fp": 1422,
+          "fn": 325,
+          "predicted_instances": 2485,
+          "target_instances": 1388,
+          "precision": 0.4277665995975855,
+          "recall": 0.765850144092219,
+          "f1": 0.5489284792150787
+        },
+        "circle_full": {
+          "class_id": 4,
+          "tp": 3055,
+          "fp": 507,
+          "fn": 113,
+          "predicted_instances": 3562,
+          "target_instances": 3168,
+          "precision": 0.8576642335766423,
+          "recall": 0.9643308080808081,
+          "f1": 0.9078751857355126
+        }
+      },
+      "semantic_foreground_miou": null,
+      "minutes": 6.5
+    },
+    "finetuned_semantic_best": {
+      "images": 664,
+      "mask_map50_95": 0.7185479396571324,
+      "mask_map50": 0.820387289927137,
+      "mask_map75": 0.7985320652074038,
+      "precision": 0.8425822122571002,
+      "recall": 0.9113783346806791,
+      "f1": 0.8756310679611651,
+      "tp": 9019,
+      "fp": 1685,
+      "fn": 877,
+      "per_class_ap": {
+        "Rectangle": {
+          "class_id": 1,
+          "tp": 4570,
+          "fp": 756,
+          "fn": 330,
+          "predicted_instances": 5326,
+          "target_instances": 4900,
+          "precision": 0.8580548253849043,
+          "recall": 0.9326530612244898,
+          "f1": 0.8938001173479366
+        },
+        "Rectangle_concave": {
+          "class_id": 2,
+          "tp": 171,
+          "fp": 126,
+          "fn": 269,
+          "predicted_instances": 297,
+          "target_instances": 440,
+          "precision": 0.5757575757575758,
+          "recall": 0.3886363636363636,
+          "f1": 0.46404341926729986
+        },
+        "circle": {
+          "class_id": 3,
+          "tp": 1150,
+          "fp": 418,
+          "fn": 238,
+          "predicted_instances": 1568,
+          "target_instances": 1388,
+          "precision": 0.7334183673469388,
+          "recall": 0.8285302593659942,
+          "f1": 0.7780784844384303
+        },
+        "circle_full": {
+          "class_id": 4,
+          "tp": 3128,
+          "fp": 385,
+          "fn": 40,
+          "predicted_instances": 3513,
+          "target_instances": 3168,
+          "precision": 0.8904070594933106,
+          "recall": 0.9873737373737373,
+          "f1": 0.9363867684478372
+        }
+      },
+      "semantic_foreground_miou": null,
+      "minutes": 6.5
+    }
+  },
+  "no_dup_652": {
+    "finetuned_epoch54": {
+      "images": 652,
+      "mask_map50_95": 0.7132894925574982,
+      "mask_map50": 0.8158828551150333,
+      "mask_map75": 0.7923194033050046,
+      "precision": 0.844294280003807,
+      "recall": 0.9141591096455071,
+      "f1": 0.8778388006531097,
+      "tp": 8871,
+      "fp": 1636,
+      "fn": 833,
+      "per_class_ap": {
+        "Rectangle": {
+          "class_id": 1,
+          "tp": 4463,
+          "fp": 743,
+          "fn": 293,
+          "predicted_instances": 5206,
+          "target_instances": 4756,
+          "precision": 0.8572800614675374,
+          "recall": 0.9383936080740117,
+          "f1": 0.8960048183095763
+        },
+        "Rectangle_concave": {
+          "class_id": 2,
+          "tp": 165,
+          "fp": 150,
+          "fn": 275,
+          "predicted_instances": 315,
+          "target_instances": 440,
+          "precision": 0.5238095238095238,
+          "recall": 0.375,
+          "f1": 0.4370860927152318
+        },
+        "circle": {
+          "class_id": 3,
+          "tp": 1117,
+          "fp": 370,
+          "fn": 223,
+          "predicted_instances": 1487,
+          "target_instances": 1340,
+          "precision": 0.7511768661735037,
+          "recall": 0.8335820895522388,
+          "f1": 0.7902370003537319
+        },
+        "circle_full": {
+          "class_id": 4,
+          "tp": 3126,
+          "fp": 373,
+          "fn": 42,
+          "predicted_instances": 3499,
+          "target_instances": 3168,
+          "precision": 0.8933981137467848,
+          "recall": 0.9867424242424242,
+          "f1": 0.9377531123443827
+        }
+      },
+      "semantic_foreground_miou": null,
+      "minutes": 6.1
+    },
+    "original_epoch105": {
+      "images": 652,
+      "mask_map50_95": 0.5208996989117459,
+      "mask_map50": 0.6813645171372127,
+      "mask_map75": 0.5924832960698057,
+      "precision": 0.6537804183283145,
+      "recall": 0.82780296784831,
+      "f1": 0.730571597471693,
+      "tp": 8033,
+      "fp": 4254,
+      "fn": 1671,
+      "per_class_ap": {
+        "Rectangle": {
+          "class_id": 1,
+          "tp": 3845,
+          "fp": 1729,
+          "fn": 911,
+          "predicted_instances": 5574,
+          "target_instances": 4756,
+          "precision": 0.6898098313598852,
+          "recall": 0.8084524810765349,
+          "f1": 0.744433688286544
+        },
+        "Rectangle_concave": {
+          "class_id": 2,
+          "tp": 118,
+          "fp": 611,
+          "fn": 322,
+          "predicted_instances": 729,
+          "target_instances": 440,
+          "precision": 0.16186556927297668,
+          "recall": 0.2681818181818182,
+          "f1": 0.2018819503849444
+        },
+        "circle": {
+          "class_id": 3,
+          "tp": 1015,
+          "fp": 1407,
+          "fn": 325,
+          "predicted_instances": 2422,
+          "target_instances": 1340,
+          "precision": 0.4190751445086705,
+          "recall": 0.7574626865671642,
+          "f1": 0.5396065922381712
+        },
+        "circle_full": {
+          "class_id": 4,
+          "tp": 3055,
+          "fp": 507,
+          "fn": 113,
+          "predicted_instances": 3562,
+          "target_instances": 3168,
+          "precision": 0.8576642335766423,
+          "recall": 0.9643308080808081,
+          "f1": 0.9078751857355126
+        }
+      },
+      "semantic_foreground_miou": null,
+      "minutes": 6.3
+    },
+    "finetuned_semantic_best": {
+      "images": 652,
+      "mask_map50_95": 0.7169866500415182,
+      "mask_map50": 0.8195485172097,
+      "mask_map75": 0.7975287550280186,
+      "precision": 0.8421453023963484,
+      "recall": 0.9126133553173948,
+      "f1": 0.8759643916913946,
+      "tp": 8856,
+      "fp": 1660,
+      "fn": 848,
+      "per_class_ap": {
+        "Rectangle": {
+          "class_id": 1,
+          "tp": 4455,
+          "fp": 737,
+          "fn": 301,
+          "predicted_instances": 5192,
+          "target_instances": 4756,
+          "precision": 0.8580508474576272,
+          "recall": 0.9367115222876367,
+          "f1": 0.8956574185765983
+        },
+        "Rectangle_concave": {
+          "class_id": 2,
+          "tp": 171,
+          "fp": 126,
+          "fn": 269,
+          "predicted_instances": 297,
+          "target_instances": 440,
+          "precision": 0.5757575757575758,
+          "recall": 0.3886363636363636,
+          "f1": 0.46404341926729986
+        },
+        "circle": {
+          "class_id": 3,
+          "tp": 1102,
+          "fp": 415,
+          "fn": 238,
+          "predicted_instances": 1517,
+          "target_instances": 1340,
+          "precision": 0.7264337508239948,
+          "recall": 0.8223880597014925,
+          "f1": 0.7714385719285964
+        },
+        "circle_full": {
+          "class_id": 4,
+          "tp": 3128,
+          "fp": 382,
+          "fn": 40,
+          "predicted_instances": 3510,
+          "target_instances": 3168,
+          "precision": 0.8911680911680911,
+          "recall": 0.9873737373737373,
+          "f1": 0.9368074273734651
+        }
+      },
+      "semantic_foreground_miou": null,
+      "minutes": 6.2
+    }
+  }
+}

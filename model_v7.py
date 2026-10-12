@@ -209,8 +209,8 @@ SEED = 42
 # Exact Model_v5 online augmentation. Do not change this block independently.
 USE_ONLINE_AUGMENTATION = True
 AUGMENTATION_CYCLE_LENGTH = 95
-MIN_ROTATION_DEGREES = 1
-MAX_ROTATION_DEGREES = 89
+MIN_ROTATION_DEGREES = 2
+MAX_ROTATION_DEGREES = 90
 ROTATION_STEP_DEGREES = 2
 ROTATE_BOTH_DIRECTIONS = True
 EXACT_ROTATION_ANGLES = tuple(
@@ -427,6 +427,20 @@ ZOOM_IN_PROBABILITY = 0.00
 # is sometimes background and sometimes not. The two fills stay independent
 # for that reason; set this to LETTERBOX_FILL_VALUE to match the bars instead.
 ZOOM_OUT_FILL_VALUE = 0
+# Mirror-side augmentation (mirror_side_sample). The board is replaced by its
+# mirror image -- the original is not kept, nothing is attached, nothing is
+# zoomed. "left" mirrors across a vertical edge (left-right flip) and "top"
+# across a horizontal edge (top-bottom flip); right and bottom are left out
+# because they would repeat those same two images. Only the real board is
+# flipped, in place inside its letterbox bars. Labels are flipped with the
+# pixels and keep their ids. The side follows the epoch: every mirrored sample
+# in an epoch uses the same side, alternating left -> top. Whether a sample
+# is mirrored at all is drawn from its own RNG stream (salt 4), so no existing
+# augmentation draw shifts. Runs before the 95-mode cycle, so it combines with
+# every mode. Set the probability to 1.0 to mirror every sample.
+USE_MIRROR_SIDE_AUGMENTATION = True
+MIRROR_SIDE_PROBABILITY = 0.25
+MIRROR_SIDES = ("left", "top")
 MAX_TRANSLATION_FRACTION = 0.04
 BRIGHTNESS_LIMIT = 0.10
 CONTRAST_LIMIT = 0.10
@@ -1939,6 +1953,54 @@ def warp_image_semantic_and_instances(
     )
 
 
+def letterboxed_board_bounds(image: np.ndarray) -> tuple[int, int, int, int]:
+    """Return (top, bottom, left, right) of the board inside its letterbox.
+
+    Letterbox bars are whole rows or columns of exactly LETTERBOX_FILL_VALUE,
+    so the board is everything between the first and last row/column that
+    holds any other value.
+    """
+    fill = float(LETTERBOX_FILL_VALUE) / 255.0
+    is_bar = np.all(np.abs(np.asarray(image) - fill) < 1e-4, axis=2)
+    rows = np.flatnonzero(~is_bar.all(axis=1))
+    cols = np.flatnonzero(~is_bar.all(axis=0))
+    if rows.size == 0 or cols.size == 0:
+        return 0, image.shape[0], 0, image.shape[1]
+    return int(rows[0]), int(rows[-1]) + 1, int(cols[0]), int(cols[-1]) + 1
+
+
+def mirror_side_sample(
+    image: np.ndarray,
+    semantic: np.ndarray,
+    instance: np.ndarray,
+    side: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Replace the board by its mirror image; the original is not kept.
+
+    "left" mirrors the board across a vertical edge (a left-right flip) and
+    "top" across a horizontal edge (a top-bottom flip).
+    Only the real board is flipped, in place inside its letterbox, so the bars
+    and the board position are unchanged. Labels are flipped with the pixels
+    and every object keeps its instance id: the mirror image has exactly the
+    objects of the original, and nothing is added.
+    """
+    if side not in MIRROR_SIDES:
+        raise ValueError(
+            f"side must be one of {MIRROR_SIDES}; received {side!r}."
+        )
+    top, bottom, left, right = letterboxed_board_bounds(image)
+    window = (slice(top, bottom), slice(left, right))
+    axis = 1 if side == "left" else 0
+
+    out_image = np.array(image, dtype=np.float32, copy=True)
+    out_semantic = np.array(semantic, dtype=np.int32, copy=True)
+    out_instance = np.array(instance, dtype=np.int32, copy=True)
+    out_image[window] = np.flip(out_image[window], axis)
+    out_semantic[window] = np.flip(out_semantic[window], axis)
+    out_instance[window] = np.flip(out_instance[window], axis)
+    return out_image, out_semantic, out_instance
+
+
 def apply_brightness_contrast(
     image: np.ndarray,
     rng: np.random.Generator,
@@ -2545,6 +2607,23 @@ class InstanceArraySequence(tf.keras.utils.Sequence):
             instance = np.asarray(
                 self.instance[sample_index], dtype=np.int32
             ).copy()
+
+            # Mirror-side first, from its own stream, so every later
+            # augmentation (the 95-mode cycle included) acts on it. The side is
+            # the same for the whole epoch: left, top, repeat.
+            if self.training and USE_MIRROR_SIDE_AUGMENTATION:
+                mirror_rng = self.augmentation_rng_for_sample(
+                    int(sample_index), salt=4
+                )
+                if mirror_rng.random() < float(MIRROR_SIDE_PROBABILITY):
+                    image, semantic, instance = mirror_side_sample(
+                        image,
+                        semantic,
+                        instance,
+                        MIRROR_SIDES[
+                            self.epoch_index % len(MIRROR_SIDES)
+                        ],
+                    )
 
             if self.training and USE_ONLINE_AUGMENTATION:
                 mode = self.augmentation_mode_for_sample(
@@ -17087,6 +17166,12 @@ def save_training_configuration(
             "zoom_out_steps": _json_compatible(ZOOM_OUT_STEPS),
             "zoom_out_fill_value": int(ZOOM_OUT_FILL_VALUE),
             "zoom_out_probability": float(ZOOM_OUT_PROBABILITY),
+            "mirror_side_probability": (
+                float(MIRROR_SIDE_PROBABILITY)
+                if USE_MIRROR_SIDE_AUGMENTATION
+                else 0.0
+            ),
+            "mirror_sides_by_epoch": list(MIRROR_SIDES),
             "zoom_in_range": _json_compatible(ZOOM_IN_RANGE),
             "zoom_in_steps": _json_compatible(ZOOM_IN_STEPS),
             "zoom_in_probability": float(ZOOM_IN_PROBABILITY),
@@ -17419,9 +17504,14 @@ def train(*, fine_tune: bool = False, transfer: bool = False) -> None:
         run_label = "from_scratch"
 
     augmentation_cycle = int(AUGMENTATION_CYCLE_LENGTH)
-    effective_early_stopping_start = max(
-        configured_early_stopping_start,
-        augmentation_cycle,
+    # The cycle guard protects a run whose weights have not yet seen every V5
+    # mode. A fine-tune starts from a model that completed the full cycle, so
+    # its configured start is honoured; otherwise a 100-epoch fine-tune could
+    # only ever stop in its last five epochs.
+    effective_early_stopping_start = (
+        configured_early_stopping_start
+        if fine_tune
+        else max(configured_early_stopping_start, augmentation_cycle)
     )
     if total_epochs <= augmentation_cycle:
         raise ValueError(
@@ -19331,6 +19421,29 @@ def run_selftest() -> None:
             f"zoom-out padded with {corner} instead of {expected_fill}"
         )
 
+    # Mirror-side: the output is only the mirror image -- pixels and labels
+    # flipped together inside the board, same objects, same ids, bars intact.
+    source_ids = np.unique(instance[instance > 0])
+    for side in MIRROR_SIDES:
+        mirror_image, mirror_semantic, mirror_instance = mirror_side_sample(
+            image, semantic, instance, side
+        )
+        axis = 1 if side == "left" else 0
+        top, bottom, left, right = letterboxed_board_bounds(image)
+        window = (slice(top, bottom), slice(left, right))
+        assert np.array_equal(
+            mirror_image[window], np.flip(image[window], axis)
+        ), f"mirror {side}: image is not the mirror of the board"
+        assert np.array_equal(
+            mirror_semantic[window], np.flip(semantic[window], axis)
+        ), f"mirror {side}: class labels were not mirrored with the pixels"
+        assert np.array_equal(
+            mirror_instance[window], np.flip(instance[window], axis)
+        ), f"mirror {side}: instance labels were not mirrored with the pixels"
+        assert np.array_equal(
+            np.unique(mirror_instance[mirror_instance > 0]), source_ids
+        ), f"mirror {side}: objects were added or lost"
+
     # The ladder must be the requested one: 5% steps from 5% to 50% out.
     assert ZOOM_OUT_STEPS == tuple(
         round(1.0 - p / 100.0, 4) for p in range(5, 51, 5)
@@ -19442,16 +19555,20 @@ def run_selftest() -> None:
     # transform -- provided copy-paste, which was added to __getitem__ after
     # this check was written and also rewrites pixels, is held off for the one
     # batch being compared. Without this the check fails on every run and says
-    # the dihedral stream is broken when it is not.
-    global USE_COPY_PASTE_AUGMENTATION
+    # the dihedral stream is broken when it is not. Mirror-side
+    # also rewrites pixels, so it is held off for the same batch.
+    global USE_COPY_PASTE_AUGMENTATION, USE_MIRROR_SIDE_AUGMENTATION
     copy_paste_was_enabled = USE_COPY_PASTE_AUGMENTATION
+    mirror_side_was_enabled = USE_MIRROR_SIDE_AUGMENTATION
     sequence.epoch_index = 0
     assert sequence.augmentation_mode_for_sample(0) == 0
     USE_COPY_PASTE_AUGMENTATION = False
+    USE_MIRROR_SIDE_AUGMENTATION = False
     try:
         batch_images, _ = sequence[0]
     finally:
         USE_COPY_PASTE_AUGMENTATION = copy_paste_was_enabled
+        USE_MIRROR_SIDE_AUGMENTATION = mirror_side_was_enabled
     raw_image = normalize_image(arrays["images"][0])
 
     if USE_DIHEDRAL_AUGMENTATION:
@@ -19618,6 +19735,9 @@ def run_selftest() -> None:
     print(
         "  zoom-out ladder is 5%-50% in 5% steps and pads with "
         f"{ZOOM_OUT_FILL_VALUE}"
+    )
+    print(
+        "  mirror-side (left/top) flips labels with the pixels"
     )
     print("  the batch loader emits valid four-head targets in every mode")
     print("  copy-paste adds whole single-class instances with centre peaks")

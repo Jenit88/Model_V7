@@ -1,0 +1,7 @@
+test_set,model,overall_pixel_accuracy,mean_iou_including_background,foreground_mean_iou,foreground_mean_precision,foreground_mean_recall,foreground_mean_f1_dice,frequency_weighted_iou
+old_test_432,original,0.9834,0.8703,0.8422,0.9238,0.905,0.9136,0.9682
+old_test_432,finetuned,0.9835,0.87,0.8418,0.9161,0.915,0.9129,0.9684
+new_test_664,original,0.9486,0.6581,0.5819,0.7025,0.7594,0.7261,0.9137
+new_test_664,finetuned,0.978,0.8156,0.7728,0.8756,0.8677,0.8699,0.9594
+new_test_652,original,0.9479,0.6557,0.579,0.7001,0.757,0.7237,0.9127
+new_test_652,finetuned,0.9777,0.8146,0.7717,0.875,0.867,0.8692,0.9589

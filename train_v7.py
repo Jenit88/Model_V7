@@ -8,6 +8,7 @@ the CPU without the library path that script exports.
     ./run.sh prepare      one-off: PNG + YOLO polygons -> memmapped arrays
     ./run.sh benchmark    measure step time and VRAM per batch size
     ./run.sh scratch      train from random initialisation
+    ./run.sh finetune     continue the finished V7 model on new/combined data
     ./run.sh report       print progress; safe while training runs
 
 Everything is scratch initialisation: no ImageNet weights, no V5 warm start,
@@ -24,7 +25,8 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-MODES = ("selftest", "prepare", "benchmark", "scratch", "report", "_bench_one")
+MODES = ("selftest", "prepare", "benchmark", "scratch", "finetune", "report",
+         "_bench_one")
 
 
 def load_model_module():
@@ -123,6 +125,62 @@ def describe(m, epochs: int) -> None:
           f"queue {m.DATA_LOADER_QUEUE_SIZE}")
     print(f"  selection : {m.INSTANCE_SELECTION_METRIC} on validation")
     print(f"  report    : {m.MODEL_OUTPUT_DIR / 'TRAINING_REPORT.md'}")
+    print(line, flush=True)
+
+
+# ---------------------------------------------------------------- fine-tuning
+# The finished scratch run's selected model (epoch 105, val mAP50-95 0.8515).
+FINE_TUNE_SOURCE_DEFAULT = (
+    "/home/u117134c/Models/Model_v7_scratch_rtx/best_model_v7_instance.keras"
+)
+
+
+def apply_fine_tune_configuration(m) -> None:
+    """Fine-tune the finished V7 model on the arrays in PCB_ARRAY_DIR.
+
+    Chosen for continuing on old + 3000_new_images data (2026-09-29):
+    the scratch run ended at its 1e-6 floor, so a fresh cosine from 1e-4
+    (a third of the scratch peak, 3 warm-up epochs) lets it learn the new
+    photos while the mixed-in old data keeps it from forgetting. The full
+    validation split is scored every 3 epochs and the run stops after 5
+    evaluations without a better instance F1, counting from epoch 10.
+    """
+    m.FINE_TUNE_SOURCE_MODEL = Path(
+        os.environ.get("PCB_FINE_TUNE_SOURCE", FINE_TUNE_SOURCE_DEFAULT)
+    )
+    m.FINE_TUNE_OUTPUT_DIR = m.MODEL_OUTPUT_DIR
+    m.FINE_TUNE_ARRAY_DIR = m.ARRAY_DIR
+    m.FINE_TUNE_EPOCHS = int(os.environ.get("PCB_EPOCHS", 100))
+    m.FINE_TUNE_LEARNING_RATE = float(
+        os.environ.get("PCB_LEARNING_RATE", 1e-4)
+    )
+    m.FINE_TUNE_MIN_LEARNING_RATE = 1e-6
+    m.FINE_TUNE_WARMUP_EPOCHS = 3
+    m.FINE_TUNE_INSTANCE_CHECKPOINT_EVERY_N_EPOCHS = 3
+    m.FINE_TUNE_INSTANCE_CHECKPOINT_MAX_IMAGES = 0
+    m.FINE_TUNE_INSTANCE_EARLY_STOPPING_PATIENCE_EVALUATIONS = 5
+    m.FINE_TUNE_INSTANCE_EARLY_STOPPING_START_EPOCH = 10
+
+
+def describe_fine_tune(m) -> None:
+    line = "=" * 74
+    print(line)
+    print("Model_v7 — fine-tune of the finished V7 model")
+    print(f"  source    : {m.FINE_TUNE_SOURCE_MODEL}")
+    print(f"  arrays    : {m.FINE_TUNE_ARRAY_DIR}")
+    print(f"  output    : {m.FINE_TUNE_OUTPUT_DIR}")
+    print(f"  batch     : {m.BATCH_SIZE} x {m.GRADIENT_ACCUMULATION_STEPS} "
+          f"accumulation (effective {m.BATCH_SIZE * m.GRADIENT_ACCUMULATION_STEPS})")
+    print(f"  epochs    : up to {m.FINE_TUNE_EPOCHS}   lr "
+          f"{m.FINE_TUNE_LEARNING_RATE} -> {m.FINE_TUNE_MIN_LEARNING_RATE} "
+          f"(cosine, {m.FINE_TUNE_WARMUP_EPOCHS} warmup)")
+    print(f"  checks    : full val every "
+          f"{m.FINE_TUNE_INSTANCE_CHECKPOINT_EVERY_N_EPOCHS} epochs; stop after "
+          f"{m.FINE_TUNE_INSTANCE_EARLY_STOPPING_PATIENCE_EVALUATIONS} without "
+          f"improvement, from epoch "
+          f"{m.FINE_TUNE_INSTANCE_EARLY_STOPPING_START_EPOCH}")
+    print(f"  mirror    : {m.MIRROR_SIDES} at p={m.MIRROR_SIDE_PROBABILITY}"
+          if m.USE_MIRROR_SIDE_AUGMENTATION else "  mirror    : off")
     print(line, flush=True)
 
 
@@ -238,7 +296,7 @@ def main() -> None:
 
     m = load_model_module()
     apply_laptop_configuration(
-        m, require_gpu=mode in ("scratch", "benchmark", "_bench_one")
+        m, require_gpu=mode in ("scratch", "finetune", "benchmark", "_bench_one")
     )
     m.validate_spatial_configuration()
     m.validate_augmentation_configuration()
@@ -266,6 +324,12 @@ def main() -> None:
             m.write_training_report(m.MODEL_OUTPUT_DIR)
             return
         sys.exit(f"No training_log.csv in {m.MODEL_OUTPUT_DIR}.")
+
+    if mode == "finetune":
+        apply_fine_tune_configuration(m)
+        describe_fine_tune(m)
+        m.train(fine_tune=True, transfer=False)
+        return
 
     describe(m, m.EPOCHS)
     m.train(fine_tune=False, transfer=False)

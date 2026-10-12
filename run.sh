@@ -5,6 +5,7 @@
 #   ./run.sh prepare     one-off: PNG + YOLO polygons -> memmapped arrays
 #   ./run.sh benchmark   measure step time / VRAM at several batch sizes
 #   ./run.sh scratch     train from random initialisation
+#   ./run.sh finetune    continue the finished V7 model (see train_v7.py)
 #   ./run.sh report      print progress; safe to run while training
 #   ./run.sh dashboard   serve the live dashboard on :8088
 #   ./run.sh tensorboard serve TensorBoard on :6006
@@ -17,7 +18,7 @@ MODE="${1:-report}"
 shift || true
 
 case "$MODE" in
-  selftest|prepare|benchmark|scratch|report)
+  selftest|prepare|benchmark|scratch|finetune|report)
     exec "$PCB_PYTHON" -u train_v7.py "$MODE" "$@"
     ;;
   dashboard)
@@ -54,8 +55,14 @@ case "$MODE" in
       --port 6006 --bind_all --reload_interval 15 \
       --reload_multifile true "$@"
     ;;
+  tb-export)
+    # The epoch, validation and instance curves TensorBoard shows (tb_export.py).
+    # CPU only: a second TensorFlow process must never take memory on the 8 GB
+    # GPU the training run is using.
+    exec env CUDA_VISIBLE_DEVICES= "$PCB_PYTHON" -u tb_export.py "$@"
+    ;;
   *)
-    echo "usage: $0 {selftest|prepare|benchmark|scratch|report|dashboard|tensorboard|predict-folder|fit-thresholds|reevaluate|tta-selfcheck}" >&2
+    echo "usage: $0 {selftest|prepare|benchmark|scratch|finetune|report|dashboard|tensorboard|tb-export|predict-folder|fit-thresholds|reevaluate|tta-selfcheck}" >&2
     exit 2
     ;;
 esac

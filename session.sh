@@ -12,6 +12,7 @@
 #   work  the training / prepare / benchmark job
 #   dash  the live dashboard on http://localhost:8088
 #   tb    TensorBoard on http://localhost:6006
+#   tbx   tb_export.py --watch: the epoch, validation and instance curves
 #   gpu   nvidia-smi, refreshed every 2 s
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -36,7 +37,7 @@ ENV_PREFIX=""
 # 120-epoch run -- the launcher accepted the variable and the pane never saw it.
 # Short runs are how the loss weight gets swept without spending 2.8 days a time,
 # so this list has to carry them.
-for name in PCB_ARRAY_DIR PCB_MODEL_OUTPUT_DIR PCB_DATASET_ROOT             PCB_EPOCHS PCB_BATCH_SIZE PCB_LEARNING_RATE             PCB_GRADIENT_ACCUMULATION_STEPS PCB_STEPS_PER_EXECUTION             PCB_USE_XLA_JIT PCB_BENCH_BATCHES; do
+for name in PCB_ARRAY_DIR PCB_MODEL_OUTPUT_DIR PCB_DATASET_ROOT             PCB_EPOCHS PCB_BATCH_SIZE PCB_LEARNING_RATE             PCB_GRADIENT_ACCUMULATION_STEPS PCB_STEPS_PER_EXECUTION             PCB_USE_XLA_JIT PCB_BENCH_BATCHES PCB_FINE_TUNE_SOURCE; do
   value="$(eval "printf '%s' \"\${$name-}\"")"
   [ -n "$value" ] && ENV_PREFIX="$ENV_PREFIX $name='$value'"
 done
@@ -63,11 +64,16 @@ ensure_windows() {
   tmux list-windows -t "$SESSION_T" -F '#{window_name}' | grep -qx dash || \
     tmux new-window -d -t "$SESSION_T" -n dash -c "$HERE" \
       "while true; do env$ENV_PREFIX ./run.sh dashboard; echo 'dashboard exited; restarting in 5s'; sleep 5; done"
+  # Keras writes only batch_* scalars; without this TensorBoard never shows an
+  # epoch, validation or instance-metric curve (see tb_export.py).
+  tmux list-windows -t "$SESSION_T" -F '#{window_name}' | grep -qx tbx || \
+    tmux new-window -d -t "$SESSION_T" -n tbx -c "$HERE" \
+      "while true; do env$ENV_PREFIX ./run.sh tb-export --watch --interval 120; echo 'tb-export exited; restarting in 30s'; sleep 30; done"
 }
 
 case "${1:-status}" in
   start)
-    MODE="${2:?usage: ./session.sh start <selftest|prepare|benchmark|scratch>}"
+    MODE="${2:?usage: ./session.sh start <selftest|prepare|benchmark|scratch|finetune>}"
     start_session
     ensure_windows
     # Forward the path overrides explicitly. A pane inherits the *tmux

@@ -1,0 +1,4 @@
+validation_set,model,images,mask_map50_95,mask_map50,mask_map75,precision,recall,f1,semantic_foreground_miou
+"original val (1,048)",original,1048,0.8515,0.9874,0.9712,0.9598,0.9839,0.9717,0.9137
+"combined val (3,128)",finetuned,3128,0.835,0.9571,0.9371,0.9393,0.9696,0.9542,0.8645
+"combined val (3,128)",original,3128,0.7524,0.9116,,0.8254,0.932,0.8755,0.7275

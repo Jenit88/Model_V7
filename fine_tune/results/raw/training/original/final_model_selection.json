@@ -1,0 +1,57 @@
+{
+  "authoritative_copy": "/home/u117134c/Models/Model_v7_scratch_rtx/best_model_v7_instance.keras",
+  "candidates": [
+    {
+      "file_size_bytes": 231056425,
+      "images_evaluated": 1048,
+      "instance_f1": 0.9716810727515792,
+      "instance_iou_threshold": 0.5,
+      "instance_precision": 0.9597806584279177,
+      "instance_recall": 0.9838803009010498,
+      "mask_map50": 0.9874424661071026,
+      "mask_map50_95": 0.8514719996285001,
+      "parameters": 6343486,
+      "path": "/home/u117134c/Models/Model_v7_scratch_rtx/best_instance_model_v7.keras",
+      "rank": 1,
+      "semantic_foreground_miou": 0.9137248161330561,
+      "status": "evaluated"
+    },
+    {
+      "file_size_bytes": 231056425,
+      "images_evaluated": 1048,
+      "instance_f1": 0.9716810727515792,
+      "instance_iou_threshold": 0.5,
+      "instance_precision": 0.9597806584279177,
+      "instance_recall": 0.9838803009010498,
+      "mask_map50": 0.9874424661071026,
+      "mask_map50_95": 0.8514719996285001,
+      "parameters": 6343486,
+      "path": "/home/u117134c/Models/Model_v7_scratch_rtx/best_semantic_model_v7.keras",
+      "rank": 2,
+      "semantic_foreground_miou": 0.9137248161330561,
+      "status": "evaluated"
+    },
+    {
+      "file_size_bytes": 231056424,
+      "images_evaluated": 1048,
+      "instance_f1": 0.9715288691144356,
+      "instance_iou_threshold": 0.5,
+      "instance_precision": 0.9596016610893844,
+      "instance_recall": 0.9837563032156733,
+      "mask_map50": 0.9876225859325102,
+      "mask_map50_95": 0.8509704887897497,
+      "parameters": 6343486,
+      "path": "/home/u117134c/Models/Model_v7_scratch_rtx/last_model_v7.keras",
+      "rank": 3,
+      "semantic_foreground_miou": 0.9132028455666596,
+      "status": "evaluated"
+    }
+  ],
+  "selected_source": "/home/u117134c/Models/Model_v7_scratch_rtx/best_instance_model_v7.keras",
+  "selection_rule": "highest complete-validation instance F1; semantic foreground mIoU, instance recall, and instance precision break ties",
+  "source_model": null,
+  "source_model_is_candidate": false,
+  "training_mode": "from_scratch",
+  "transfer_manifest": null,
+  "validation_images": 1048
+}
