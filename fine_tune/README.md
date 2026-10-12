@@ -5,12 +5,14 @@ The original Model V7 was trained from scratch on the `1000_images` photos (see 
 52.4 % mask mAP50-95. This folder holds the **fine-tuned model**: the same network, trained
 further on the original and the new photos together, and a full comparison of the two.
 
-**In short:** on new photos, fine-tuning raised mAP50-95 from 52.4 % to 71.5 %. It did not
-forget the original photos; it scored better there too (75.5 % → 77.8 %).
+**In short:** over all 1,096 test photos, mask mAP50-95 rose from 61.3 % to 71.1 % and F1 from
+91.0 % to 95.0 %. On new photos it rose from 52.4 % to 71.5 %. It did not forget the original
+photos; it scored better there too (75.5 % → 77.8 %).
 
-- [1. Headline result](#1-headline-result)
+- [Overall performance](#overall-performance-all-1096-test-photos-together) ·
+  [1. Result per test set](#1-result-per-test-set)
 - [2. How the comparison was made](#2-how-the-comparison-was-made)
-- [3. Overall test metrics](#3-overall-test-metrics) · [4. Per class](#4-per-class) ·
+- [3. Test metrics per test set](#3-test-metrics-per-test-set) · [4. Per class](#4-per-class) ·
   [5. Mask quality](#5-mask-quality-map-at-each-iou-threshold) ·
   [6. Semantic segmentation](#6-semantic-segmentation-per-pixel) · [7. Validation](#7-validation)
 - [8. What the fine-tune changed](#8-what-the-fine-tune-changed) ·
@@ -28,7 +30,49 @@ forget the original photos; it scored better there too (75.5 % → 77.8 %).
 | Training period | 2026-09-11 to 2026-09-14 | 2026-09-29 14:37 to 2026-10-06 ~02:15 |
 | Parameters | 6,343,486 | 6,343,486 (same architecture) |
 
-## 1. Headline result
+## Overall performance (all 1,096 test photos together)
+
+Both test splits pooled into one test set (432 original + 664 new photos), scored in one
+evaluation per model ([`eval_all_test_compare.py`](../eval_all_test_compare.py)). This is the single number for
+"how good is the model overall". It is computed directly, not averaged from the separate
+results, because mAP cannot be averaged across test sets.
+
+| Metric (1,096 photos, 43,384 labelled objects) | Original | Fine-tuned | Change |
+|---|---|---|---|
+| **mask mAP50-95** | 61.3 % | **71.1 %** | **+9.8** |
+| mask mAP50 | 79.7 % | **87.5 %** | +7.8 |
+| mask mAP75 | 69.8 % | **80.1 %** | +10.3 |
+| Precision (IoU 0.5) | 87.7 % | **93.5 %** | +5.7 |
+| Recall (IoU 0.5) | 94.5 % | **96.6 %** | +2.1 |
+| **F1 (IoU 0.5)** | 91.0 % | **95.0 %** | **+4.0** |
+| Correct detections (TP) | 41,006 | 41,927 | +921 |
+| False detections (FP) | 5,735 | 2,931 | −49 % |
+| Missed objects (FN) | 2,378 | 1,457 | −39 % |
+| Semantic foreground mIoU (per pixel) | 65.5 % | **80.1 %** | +14.6 |
+| Pixel accuracy | 96.2 % | 98.0 % | +1.8 |
+
+Per class (AP50-95, all 1,096 photos):
+
+| Class | Objects | Original | Fine-tuned | Change |
+|---|---|---|---|---|
+| Rectangle | 20,056 | 77.3 % | **81.9 %** | +4.6 |
+| Rectangle_concave | 548 | 36.3 % | **57.7 %** | +21.4 |
+| circle | 4,660 | 55.7 % | **64.3 %** | +8.6 |
+| circle_full | 18,120 | 75.9 % | **80.4 %** | +4.5 |
+
+mAP at each IoU threshold (all 1,096 photos):
+
+| IoU | 0.50 | 0.60 | 0.70 | 0.75 | 0.80 | 0.85 | 0.90 | 0.95 |
+|---|---|---|---|---|---|---|---|---|
+| Original | 79.7 | 78.2 | 73.3 | 69.8 | 64.2 | 53.6 | 33.2 | 5.7 |
+| Fine-tuned | 87.5 | 86.4 | 82.9 | 80.1 | 75.3 | 66.6 | 48.0 | 12.0 |
+
+**Verdict:** the fine-tuned model is better overall on every overall metric, on every class, and
+at every IoU threshold. It makes about half as many false detections and misses 39 % fewer
+objects. The pooled TP and FN counts equal the sums of the two separate test runs exactly; the
+FP counts differ by 7 (original) and 4 (fine-tuned) from those sums.
+
+## 1. Result per test set
 
 | Test set | Metric | Original | Fine-tuned | Change |
 |---|---|---|---|---|
@@ -66,7 +110,7 @@ forget the original photos; it scored better there too (75.5 % → 77.8 %).
   image, confidence = mean class probability over the instance); precision, recall and F1 by
   one-to-one same-class mask matching at IoU 0.50; semantic metrics per pixel.
 
-## 3. Overall test metrics
+## 3. Test metrics per test set
 
 | Test set | Model | mAP50-95 | mAP50 | mAP75 | Precision | Recall | F1 | TP | FP | FN |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -223,7 +267,8 @@ result = m.predict_one_image(model, Path("board.png"), Path("output/board"))
    The settings are in `apply_fine_tune_configuration` in [`train_v7.py`](../train_v7.py).
    It took about 6.5 days on an 8 GB laptop GPU (about 2.1 h per epoch including the
    validation checks).
-4. Score both models on both test sets: `eval_old_test_compare.py` and `eval_new_test_compare.py`.
+4. Score both models: `eval_old_test_compare.py`, `eval_new_test_compare.py` and, for both test
+   sets together, `eval_all_test_compare.py`.
 
 Note: `model_v7.py` in this repository is the version the fine-tune used: exact rotations
 2°, 4°, …, 90° and mirror-side augmentation on. The original scratch run used rotations
@@ -235,7 +280,7 @@ Note: `model_v7.py` in this repository is the version the fine-tune used: exact 
 | Path | Contents |
 |---|---|
 | `model/best_fine_tuned_model_v7_instance.keras` | the fine-tuned model (epoch 54, 27 MB) |
-| `results/tables/overall_test.csv` | Section 3, all three test scopes |
+| `results/tables/overall_test.csv` | overall and Section 3, all four test scopes |
 | `results/tables/per_class_test.csv` | per class: targets, predictions, TP/FP/FN, P/R/F1, AP50/AP75/AP50-95 |
 | `results/tables/map_by_iou_test.csv` | mAP at each IoU 0.50…0.95 |
 | `results/tables/semantic_test.csv`, `semantic_per_class_test.csv` | per-pixel metrics |
@@ -243,7 +288,7 @@ Note: `model_v7.py` in this repository is the version the fine-tune used: exact 
 | `results/tables/validation_checks_during_training.csv` | every validation check of both runs |
 | `results/tables/training_config_differences.csv` | every config setting that differs |
 | `results/tables/comparison_all.json` | all of the above in one JSON |
-| `results/figures/` | the five charts shown here |
+| `results/figures/` | the five charts shown here (the three test charts have one panel per test scope) |
 | `results/raw/test/<scope>/<model>/` | the unchanged evaluation JSONs per test scope and model |
 | `results/raw/validation/<model>/` | each run's final validation evaluation |
 | `results/raw/training/<model>/` | training config, per-epoch log, checkpoint history, model selection, report, model summary |

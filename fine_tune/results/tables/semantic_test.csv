@@ -1,4 +1,6 @@
 test_set,model,overall_pixel_accuracy,mean_iou_including_background,foreground_mean_iou,foreground_mean_precision,foreground_mean_recall,foreground_mean_f1_dice,frequency_weighted_iou
+all_test_1096,original,0.9623,0.7179,0.6547,0.7698,0.7993,0.7829,0.934
+all_test_1096,finetuned,0.9802,0.8375,0.8006,0.8941,0.8839,0.8881,0.9629
 old_test_432,original,0.9834,0.8703,0.8422,0.9238,0.905,0.9136,0.9682
 old_test_432,finetuned,0.9835,0.87,0.8418,0.9161,0.915,0.9129,0.9684
 new_test_664,original,0.9486,0.6581,0.5819,0.7025,0.7594,0.7261,0.9137

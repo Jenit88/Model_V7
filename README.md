@@ -8,7 +8,7 @@ Model V7 looks at a photo of a printed circuit board (PCB) and finds four kinds 
 
 The model was trained from scratch and is ready to use. The trained model file is on the [Releases page](https://github.com/Jenit88/Model_V7/releases); see [Use the trained model](#use-the-trained-model).
 
-**Fine-tuned model:** the model was later fine-tuned on a new set of photos (`3000_new_images`) together with the original ones. On the new photos it scores 71.5 % mask mAP50-95 instead of 52.4 %, and on the original test photos 77.8 % instead of 75.5 %. The fine-tuned model, the full comparison and how to repeat it are in [`fine_tune/`](fine_tune/README.md).
+**Fine-tuned model:** the model was later fine-tuned on a new set of photos (`3000_new_images`) together with the original ones. Over all 1,096 test photos it scores 71.1 % mask mAP50-95 instead of 61.3 % (F1 95.0 % instead of 91.0 %): 71.5 % instead of 52.4 % on the new photos and 77.8 % instead of 75.5 % on the original test photos. The fine-tuned model, the full comparison and how to repeat it are in [`fine_tune/`](fine_tune/README.md).
 
 ![Model V7 result on a test image](results/examples/sample_val_000017.png)
 
@@ -466,7 +466,7 @@ You can also run `./run.sh scratch` to train in the current terminal instead. 12
 | `results/` | training outputs, evaluation reports, per-image results and example pictures |
 | `fine_tune/` | the fine-tuned model (27 MB), its comparison with the original model, and all evaluation files |
 | `build_combined_arrays.py` | combines the original and the new photo arrays for the fine-tune |
-| `eval_old_test_compare.py`, `eval_new_test_compare.py` | score the original and the fine-tuned model on the original and the new test split |
+| `eval_old_test_compare.py`, `eval_new_test_compare.py`, `eval_all_test_compare.py` | score the original and the fine-tuned model on the original test split, the new test split, and both together |
 | `tb_export.py` | writes the epoch, validation and instance curves for TensorBoard |
 | `TRAINING.md`, `change.md`, `change_2.md`, `inspection.md` | development notes, written before the final training run |
 | Releases → `best_model_v7_instance.keras` | the trained model (231 MB) |
